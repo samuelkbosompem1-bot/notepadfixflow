@@ -1,0 +1,1686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Notepad FixFlow</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F7F3F4;
+    --surface:#FFFFFF;
+    --surface-2:#FBF6F7;
+    --border:#E7DCDE;
+    --border-strong:#D6C3C7;
+    --text:#251A1D;
+    --text-secondary:#6B5459;
+    --text-muted:#9C8790;
+    --accent:#6E1F30;
+    --accent-hover:#571726;
+    --accent-soft:#F2E1E5;
+    --critical:#A13A2E; --critical-bg:#FBEAE7;
+    --high:#A66A1F; --high-bg:#FAF0DF;
+    --medium:#8C7A1E; --medium-bg:#F8F4D9;
+    --low:#3E7256; --low-bg:#E7F1EC;
+    --danger:#A13A2E;
+    --radius:8px;
+    --shadow-sm:0 1px 2px rgba(37,26,29,0.06);
+    --shadow-md:0 4px 16px rgba(37,26,29,0.12);
+    font-size:15px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .mono{font-family:'JetBrains Mono',monospace;}
+  a{color:inherit;}
+  button{font-family:inherit;cursor:pointer;}
+  ::selection{background:var(--accent-soft);}
+
+  /* Layout */
+  .app{display:flex;min-height:100vh;}
+  .sidebar{
+    width:220px;flex-shrink:0;background:var(--surface);
+    border-right:1px solid var(--border);
+    display:flex;flex-direction:column;
+    padding:22px 16px;position:sticky;top:0;height:100vh;
+  }
+  .logo{display:flex;align-items:center;gap:10px;padding:0 4px 22px 4px;border-bottom:1px solid var(--border);margin-bottom:18px;}
+  .logo-mark{
+    width:30px;height:30px;border-radius:6px;background:var(--accent);
+    display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  }
+  .logo-mark svg{width:16px;height:16px;}
+  .logo-text{font-family:'Fraunces',serif;font-size:16.5px;font-weight:600;line-height:1.15;letter-spacing:-0.01em;}
+  .logo-text small{display:block;font-family:'Inter',sans-serif;font-size:10px;font-weight:500;color:var(--text-muted);letter-spacing:0.06em;text-transform:uppercase;margin-top:1px;}
+
+  .nav{display:flex;flex-direction:column;gap:2px;}
+  .nav-item{
+    display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:6px;
+    color:var(--text-secondary);font-size:13.5px;font-weight:500;text-decoration:none;
+    border:none;background:none;text-align:left;width:100%;
+  }
+  .nav-item svg{width:16px;height:16px;flex-shrink:0;opacity:0.75;}
+  .nav-item:hover{background:var(--surface-2);color:var(--text);}
+  .nav-item.active{background:var(--accent-soft);color:var(--accent);font-weight:600;}
+  .nav-item.active svg{opacity:1;}
+  .nav-count{margin-left:auto;font-size:11px;color:var(--text-muted);font-weight:600;}
+
+  .sidebar-footer{margin-top:auto;padding-top:14px;border-top:1px solid var(--border);}
+  .btn-new{
+    width:100%;background:var(--accent);color:#fff;border:none;border-radius:6px;
+    padding:10px 12px;font-size:13.5px;font-weight:600;display:flex;align-items:center;gap:8px;justify-content:center;
+  }
+  .btn-new:hover{background:var(--accent-hover);}
+
+  .main{flex:1;min-width:0;padding:28px 36px 60px 36px;max-width:1180px;}
+  .topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;gap:16px;}
+  .search-box{
+    display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);
+    border-radius:7px;padding:8px 12px;flex:1;max-width:360px;
+  }
+  .search-box svg{width:14px;height:14px;color:var(--text-muted);flex-shrink:0;}
+  .search-box input{border:none;outline:none;background:none;font-size:13.5px;width:100%;color:var(--text);}
+  .save-indicator{font-size:11.5px;color:var(--text-muted);display:flex;align-items:center;gap:6px;white-space:nowrap;}
+  .save-dot{width:6px;height:6px;border-radius:50%;background:var(--low);}
+
+  h1.page-title{font-family:'Fraunces',serif;font-size:26px;font-weight:600;margin:0 0 4px 0;letter-spacing:-0.01em;}
+  .page-sub{color:var(--text-secondary);font-size:13.5px;margin:0 0 26px 0;}
+
+  /* Stat cards */
+  .stat-row{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:28px;}
+  .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;}
+  .stat-num{font-family:'Fraunces',serif;font-size:26px;font-weight:600;line-height:1;}
+  .stat-label{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-top:6px;font-weight:600;}
+  .stat-card.warn .stat-num{color:var(--critical);}
+  .stat-card.amber .stat-num{color:var(--high);}
+  .stat-card.good .stat-num{color:var(--low);}
+
+  /* Section blocks */
+  .section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:18px;overflow:hidden;}
+  .section-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);}
+  .section-head h2{font-size:14px;font-weight:600;margin:0;display:flex;align-items:center;gap:8px;}
+  .section-head .see-all{font-size:12px;color:var(--accent);font-weight:600;text-decoration:none;border:none;background:none;}
+  .section-body{padding:6px;}
+  .section-empty{padding:26px 18px;text-align:center;color:var(--text-muted);font-size:13px;}
+
+  /* Issue row (dashboard) */
+  .irow{
+    display:flex;align-items:center;gap:14px;padding:12px 12px;border-radius:6px;text-decoration:none;color:inherit;
+    border:1px solid transparent;
+  }
+  .irow:hover{background:var(--surface-2);border-color:var(--border);}
+  .irow + .irow{border-top:1px solid var(--border);border-radius:0;}
+  .irow:hover + .irow, .irow:has(+ .irow:hover){border-top-color:transparent;}
+  .palette-active{background:var(--surface-2);border-color:var(--border);}
+  .prio-bar{width:4px;align-self:stretch;border-radius:3px;flex-shrink:0;min-height:34px;}
+  .prio-bar.CRITICAL{background:var(--critical);}
+  .prio-bar.HIGH{background:var(--high);}
+  .prio-bar.MEDIUM{background:var(--medium);}
+  .prio-bar.LOW{background:var(--low);}
+  .irow-id{font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--text-muted);font-weight:500;width:64px;flex-shrink:0;}
+  .irow-main{flex:1;min-width:0;}
+  .irow-title{font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .irow-meta{font-size:12px;color:var(--text-secondary);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .irow-flag{font-size:11.5px;font-weight:600;padding:3px 8px;border-radius:20px;white-space:nowrap;flex-shrink:0;}
+  .flag-overdue{background:var(--critical-bg);color:var(--critical);}
+  .flag-today{background:var(--high-bg);color:var(--high);}
+  .flag-inactive{background:var(--medium-bg);color:var(--medium);}
+  .flag-solved{background:var(--low-bg);color:var(--low);}
+
+  /* Badges */
+  .badge{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:20px;white-space:nowrap;}
+  .badge.CRITICAL{background:var(--critical-bg);color:var(--critical);}
+  .badge.HIGH{background:var(--high-bg);color:var(--high);}
+  .badge.MEDIUM{background:var(--medium-bg);color:var(--medium);}
+  .badge.LOW{background:var(--low-bg);color:var(--low);}
+  .badge.status{background:var(--accent-soft);color:var(--accent);}
+  .badge.status.SOLVED, .badge.status.CLOSED{background:var(--low-bg);color:var(--low);}
+  .badge.status.ON_HOLD{background:var(--surface-2);color:var(--text-muted);border:1px solid var(--border);}
+  .dot{width:6px;height:6px;border-radius:50%;display:inline-block;}
+  .dot.rep-yes{background:var(--low);} .dot.rep-no{background:var(--border-strong);}
+
+  /* Table (All Issues) */
+  .filters-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;align-items:center;}
+  .bulk-bar{display:flex;align-items:center;gap:10px;padding:10px 16px;margin-bottom:14px;background:var(--accent-soft);border-color:var(--accent);flex-wrap:wrap;}
+  .bulk-bar strong{font-size:13px;color:var(--accent);}
+  select, .input{
+    border:1px solid var(--border);background:var(--surface);border-radius:6px;padding:7px 10px;
+    font-size:12.5px;color:var(--text);font-family:inherit;
+  }
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  .table-scroll{overflow-x:auto;}
+  th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-muted);
+     padding:10px 12px;border-bottom:1px solid var(--border);font-weight:600;}
+  td{padding:11px 12px;border-bottom:1px solid var(--border);vertical-align:middle;}
+  tr:last-child td{border-bottom:none;}
+  tr.tr-link{cursor:pointer;}
+  tr.tr-link:hover{background:var(--surface-2);}
+  .cell-title{font-weight:600;}
+  .cell-sub{color:var(--text-muted);font-size:11.5px;}
+
+  /* Buttons */
+  .btn{border:1px solid var(--border);background:var(--surface);border-radius:6px;padding:8px 14px;font-size:13px;font-weight:600;color:var(--text);}
+  .btn:hover{background:var(--surface-2);}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+  .btn.primary:hover{background:var(--accent-hover);}
+  .btn.danger{color:var(--critical);border-color:var(--critical-bg);}
+  .btn.danger:hover{background:var(--critical-bg);}
+  .btn.sm{padding:6px 10px;font-size:12px;}
+  .icon-btn{display:inline-flex;align-items:center;justify-content:center;padding:6px 9px;}
+  .icon-btn.reminder-set{color:var(--low);background:var(--low-bg);border-color:var(--low-bg);}
+  .icon-btn.reminder-set:hover{background:var(--low-bg);}
+  .btn:disabled{opacity:0.45;cursor:not-allowed;}
+  .btn-row{display:flex;gap:8px;flex-wrap:wrap;}
+
+  /* Issue Detail */
+  .detail-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px;gap:16px;}
+  .detail-idline{font-family:'JetBrains Mono',monospace;color:var(--text-muted);font-size:12px;margin-bottom:6px;}
+  .detail-title{font-family:'Fraunces',serif;font-size:23px;font-weight:600;margin:0 0 10px 0;}
+  .detail-badges{display:flex;gap:8px;margin-bottom:22px;flex-wrap:wrap;}
+  .grid-2{display:grid;grid-template-columns:1.6fr 1fr;gap:18px;align-items:start;}
+  .kv{display:grid;grid-template-columns:130px 1fr;gap:8px 12px;font-size:13px;padding:14px 18px;}
+  .kv dt{color:var(--text-muted);}
+  .kv dd{margin:0;}
+  .card-title{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);padding:14px 18px 8px 18px;}
+  .card-text{padding:0 18px 16px 18px;font-size:13.5px;line-height:1.55;white-space:pre-wrap;}
+  .followup-box{padding:14px 18px;}
+  .followup-status{font-size:13px;font-weight:700;margin-bottom:4px;}
+  .followup-status.overdue{color:var(--critical);}
+  .followup-status.today{color:var(--high);}
+  .followup-status.upcoming{color:var(--text-secondary);}
+  .followup-status.none{color:var(--text-muted);}
+
+  /* Timeline */
+  .timeline{padding:6px 18px 16px 18px;}
+  .tl-item{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);}
+  .tl-item:last-child{border-bottom:none;}
+  .tl-date{width:78px;flex-shrink:0;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-muted);padding-top:2px;}
+  .tl-body{flex:1;min-width:0;}
+  .tl-label{font-size:12.5px;font-weight:600;margin-bottom:2px;}
+  .tl-detail{font-size:12.5px;color:var(--text-secondary);line-height:1.5;}
+  .tl-detail .field{color:var(--text-muted);}
+
+  /* Modal */
+  .overlay{position:fixed;inset:0;background:rgba(20,24,34,0.45);display:flex;align-items:flex-start;justify-content:center;
+           padding:5vh 16px;z-index:100;overflow-y:auto;}
+  .modal{background:var(--surface);border-radius:10px;width:100%;max-width:560px;box-shadow:var(--shadow-md);margin-bottom:5vh;}
+  .modal-head{display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--border);}
+  .modal-head h3{font-family:'Fraunces',serif;font-size:18px;margin:0;font-weight:600;}
+  .modal-close{background:none;border:none;color:var(--text-muted);font-size:20px;line-height:1;padding:4px;}
+  .modal-body{padding:20px 22px;max-height:70vh;overflow-y:auto;}
+  .modal-foot{display:flex;justify-content:flex-end;gap:8px;padding:16px 22px;border-top:1px solid var(--border);}
+  .field-row{margin-bottom:14px;}
+  .field-row label{display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:5px;}
+  .field-row input[type=text], .field-row input[type=date], .field-row textarea, .field-row select{
+    width:100%;border:1px solid var(--border);border-radius:6px;padding:9px 11px;font-size:13.5px;font-family:inherit;color:var(--text);background:var(--surface);
+  }
+  .field-row textarea{resize:vertical;min-height:70px;}
+  .field-2col{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .req{color:var(--critical);}
+  .hint{font-size:11.5px;color:var(--text-muted);margin-top:4px;}
+
+  .empty-state{text-align:center;padding:70px 20px;color:var(--text-muted);}
+  .empty-state h3{font-family:'Fraunces',serif;color:var(--text);font-size:18px;margin-bottom:6px;}
+
+  .toast{position:fixed;bottom:22px;right:22px;background:var(--accent);color:#fff;padding:11px 18px;border-radius:7px;
+         font-size:13px;font-weight:500;box-shadow:var(--shadow-md);z-index:200;}
+  .toast.error{background:var(--critical);}
+
+  .attach-item{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;}
+  .attach-item:last-child{border-bottom:none;}
+  .attach-remove{margin-left:auto;background:none;border:none;color:var(--text-muted);font-size:16px;}
+  .attach-thumb{display:inline-flex;align-items:center;gap:8px;}
+  .attach-thumb img{width:44px;height:44px;object-fit:cover;border-radius:6px;border:1px solid var(--border);cursor:pointer;display:block;}
+  .field-row input[type=file]{width:100%;font-size:12.5px;color:var(--text-secondary);border:1px dashed var(--border-strong);border-radius:6px;padding:10px;background:var(--surface-2);}
+
+  .fab-new{display:none;}
+  @media (max-width: 880px){
+    .stat-row{grid-template-columns:repeat(3,1fr);}
+    .grid-2{grid-template-columns:1fr;}
+    .sidebar{position:fixed;left:0;bottom:0;top:auto;width:100%;height:auto;flex-direction:row;
+             border-right:none;border-top:1px solid var(--border);padding:8px 10px;z-index:50;justify-content:space-around;}
+    .logo,.sidebar-footer{display:none;}
+    .nav{flex-direction:row;width:100%;justify-content:space-around;}
+    .nav-item{flex-direction:column;font-size:10.5px;gap:3px;padding:6px 4px;}
+    .nav-count{display:none;}
+    .main{padding:20px 16px 90px 16px;}
+    .field-2col{grid-template-columns:1fr;}
+    .topbar{flex-wrap:wrap;gap:8px;}
+    .search-box{flex:1 1 100%;max-width:none;order:1;}
+    .save-indicator{order:2;}
+    #backupBtn{order:3;margin-left:auto;}
+    .fab-new{display:flex;position:fixed;right:16px;bottom:74px;width:52px;height:52px;border-radius:50%;
+              background:var(--accent);color:#fff;border:none;align-items:center;justify-content:center;
+              font-size:26px;font-weight:400;box-shadow:var(--shadow-md);z-index:60;line-height:1;}
+  }
+  @media print{
+    .sidebar,.topbar,.btn-row,.filters-bar,#modal-root,.fab-new,.bulk-bar,.no-print{display:none !important;}
+    body{background:#fff;}
+    .main{padding:0;max-width:100%;}
+    .section{break-inside:avoid;border:1px solid #ccc;box-shadow:none;}
+    a[href]:after{content:"";}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2H4a1 1 0 0 0-1 1v18a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V8l-6-6z"/><path d="M15 2v6h6"/><path d="M9 13h6M9 17h4"/></svg>
+      </div>
+      <div class="logo-text">Notepad<br>FixFlow<small>Never forget an issue</small></div>
+    </div>
+    <nav class="nav" id="nav"></nav>
+    <div class="sidebar-footer">
+      <button class="btn-new" id="btnNewIssueNav">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        New Issue
+      </button>
+    </div>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <div class="search-box">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <input type="text" id="globalSearch" placeholder="Search issues, people, updates…">
+      </div>
+      <div class="save-indicator" id="saveIndicator"><span class="save-dot"></span>Saved</div>
+      <button class="btn sm" id="backupBtn">Backup</button>
+    </div>
+    <div id="view-root"></div>
+  </main>
+</div>
+<button class="fab-new" id="fabNew" aria-label="New Issue">+</button>
+<div id="modal-root"></div>
+
+<script>
+/* ============================= STORAGE FALLBACK ============================= */
+/* If this file is opened outside the Claude environment (double-clicked, hosted elsewhere),
+   window.storage won't exist. Shim it with localStorage so the app still works standalone. */
+(function ensureStorage(){
+  if(window.storage && typeof window.storage.get === 'function') return;
+  const PREFIX = 'fixflow-shim::';
+  window.storage = {
+    async get(key){
+      const raw = localStorage.getItem(PREFIX+key);
+      if(raw===null) throw new Error('Key not found: ' + key);
+      return { key, value: raw, shared:false };
+    },
+    async set(key, value){
+      localStorage.setItem(PREFIX+key, value);
+      return { key, value, shared:false };
+    },
+    async delete(key){
+      const existed = localStorage.getItem(PREFIX+key) !== null;
+      localStorage.removeItem(PREFIX+key);
+      return { key, deleted: existed, shared:false };
+    },
+    async list(prefix){
+      const keys = [];
+      for(let idx=0; idx<localStorage.length; idx++){
+        const k = localStorage.key(idx);
+        if(k && k.startsWith(PREFIX)){
+          const stripped = k.slice(PREFIX.length);
+          if(!prefix || stripped.startsWith(prefix)) keys.push(stripped);
+        }
+      }
+      return { keys, prefix, shared:false };
+    }
+  };
+})();
+
+/* ============================= STATE & STORAGE ============================= */
+let state = { issues: [], nextNum: 1 };
+let view = { name: 'dashboard', issueId: null };
+let filters = { status:'', priority:'', reported:'', followup:'', search:'', sort:'smart', dateFrom:'', dateTo:'' };
+let selectedIds = new Set();
+const STORAGE_KEY = 'fixflow-data-v1';
+const INACTIVE_DAYS = 5;
+
+function defaultState(){ return { issues: [], nextNum: 1 }; }
+
+async function loadData(){
+  try{
+    const res = await window.storage.get(STORAGE_KEY, false);
+    state = (res && res.value) ? JSON.parse(res.value) : defaultState();
+  }catch(e){
+    state = defaultState();
+  }
+}
+let saveTimer = null;
+async function saveData(){
+  const indicator = document.getElementById('saveIndicator');
+  if(indicator) indicator.innerHTML = '<span class="save-dot" style="background:var(--high)"></span>Saving…';
+  let payload;
+  try{
+    payload = JSON.stringify(state);
+  }catch(e){
+    if(indicator) indicator.innerHTML = '<span class="save-dot" style="background:var(--critical)"></span>Save failed';
+    showToast('Could not save: ' + (e && e.message ? e.message : 'invalid data') + '.', true);
+    console.error('FixFlow save error (stringify):', e);
+    return;
+  }
+  const sizeMB = payload.length / (1024*1024);
+  try{
+    await window.storage.set(STORAGE_KEY, payload, false);
+    if(indicator) indicator.innerHTML = '<span class="save-dot"></span>Saved';
+    if(sizeMB > 4.2){
+      showToast(`Warning: your data is ${sizeMB.toFixed(2)}MB, nearing the 5MB storage limit. Use Backup, then consider archiving old issues.`, true);
+    }
+  }catch(e){
+    if(indicator) indicator.innerHTML = '<span class="save-dot" style="background:var(--critical)"></span>Save failed';
+    const detail = (e && e.message) ? e.message : String(e);
+    showToast(`Could not save (${detail}). Data size: ${sizeMB.toFixed(2)}MB. Use Backup now so you don't lose this change.`, true);
+    console.error('FixFlow save error (storage.set):', e);
+  }
+}
+
+/* ============================= UTILITIES ============================= */
+function uid(){ return 'id-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,8); }
+function todayISO(){ return new Date().toISOString().slice(0,10); }
+function nowISO(){ return new Date().toISOString(); }
+function fmtDate(iso){
+  if(!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+}
+function fmtDateTime(iso){
+  if(!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) + ' — ' + d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+}
+function fmtRelative(iso){
+  if(!iso) return '—';
+  const days = daysSince(iso);
+  if(days === 0) return 'Today';
+  if(days === 1) return 'Yesterday';
+  if(days < 14) return days + ' days ago';
+  if(days < 60) return Math.floor(days/7) + ' weeks ago';
+  return Math.floor(days/30) + ' months ago';
+}
+function daysSince(iso){
+  if(!iso) return 0;
+  const then = new Date(iso); then.setHours(0,0,0,0);
+  const now = new Date(); now.setHours(0,0,0,0);
+  return Math.round((now - then) / 86400000);
+}
+function daysUntil(iso){
+  if(!iso) return null;
+  const target = new Date(iso); target.setHours(0,0,0,0);
+  const now = new Date(); now.setHours(0,0,0,0);
+  return Math.round((target - now) / 86400000);
+}
+function ageLabel(iso){
+  const days = daysSince(iso);
+  if(days < 14) return days + (days===1?' day old':' days old');
+  if(days < 60) return Math.floor(days/7) + (Math.floor(days/7)===1?' week old':' weeks old');
+  return Math.floor(days/30) + (Math.floor(days/30)===1?' month old':' months old');
+}
+function esc(s){
+  if(s===null||s===undefined) return '';
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function isOpen(issue){ return issue.status !== 'SOLVED' && issue.status !== 'CLOSED'; }
+function lastActivityDate(issue){
+  let latest = issue.createdAt;
+  if(issue.lastActionAt && issue.lastActionAt > latest) latest = issue.lastActionAt;
+  (issue.updates||[]).forEach(u => { if(u.createdAt > latest) latest = u.createdAt; });
+  return latest;
+}
+function followUpState(issue){
+  if(!issue.nextFollowUpDate || !isOpen(issue)) return { state:'none', label:'—' };
+  const d = daysUntil(issue.nextFollowUpDate);
+  if(d < 0) return { state:'overdue', label:'Overdue by ' + Math.abs(d) + (Math.abs(d)===1?' day':' days') };
+  if(d === 0) return { state:'today', label:'Due today' };
+  return { state:'upcoming', label: fmtDate(issue.nextFollowUpDate) };
+}
+function isInactive(issue){
+  if(!isOpen(issue)) return false;
+  return daysSince(lastActivityDate(issue)) >= INACTIVE_DAYS;
+}
+function reminderState(issue){
+  if(!issue.dueDate || !isOpen(issue)) return { state:'none' };
+  const d = daysUntil(issue.dueDate);
+  if(d < 0) return { state:'overdue', days: Math.abs(d) };
+  if(d === 0) return { state:'due_today' };
+  if(d <= 3) return { state:'due_soon', days:d };
+  return { state:'upcoming', days:d };
+}
+function reminderLabel(issue){
+  const r = reminderState(issue);
+  if(r.state==='none') return 'No due date set';
+  if(r.state==='overdue') return `Overdue by ${r.days} day${r.days===1?'':'s'}`;
+  if(r.state==='due_today') return 'Due today';
+  return `Due in ${r.days} day${r.days===1?'':'s'}`;
+}
+function reminderCssClass(state){
+  return { overdue:'overdue', due_today:'today', due_soon:'upcoming', upcoming:'upcoming', none:'none' }[state] || 'none';
+}
+function applyDueDate(issue, newDate){
+  const normalized = newDate || null;
+  if(issue.dueDate !== normalized){
+    issue.dueDate = normalized;
+    issue.reminderNotified = [];
+  }
+}
+function statusLabel(s){
+  return { NEW:'New', REPORTED:'Reported', IN_PROGRESS:'In Progress', AWAITING_RESPONSE:'Awaiting Response',
+           SOLVED:'Solved', CLOSED:'Closed', ON_HOLD:'On Hold' }[s] || s;
+}
+function priorityLabel(p){ return { CRITICAL:'Critical', HIGH:'High', MEDIUM:'Medium', LOW:'Low' }[p] || p; }
+function getIssue(id){ return state.issues.find(i => i.id === id); }
+function distinctValues(field){
+  const set = new Set();
+  state.issues.forEach(i=>{ if(i[field]) set.add(i[field]); });
+  return Array.from(set).sort();
+}
+function datalistOptions(id, field){
+  return `<datalist id="${id}">${distinctValues(field).map(v=>`<option value="${esc(v)}">`).join('')}</datalist>`;
+}
+function nextIssueNumber(){ return 'FX-' + String(state.nextNum).padStart(4,'0'); }
+function showToast(msg, isError){
+  const t = document.createElement('div');
+  t.className = 'toast' + (isError ? ' error' : '');
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3200);
+}
+function pushHistory(issue, action, prev, next){
+  issue.history = issue.history || [];
+  issue.history.push({ id: uid(), action, previousValue: prev || null, newValue: next || null, createdAt: nowISO() });
+}
+
+/* ============================= NAV / ROUTING ============================= */
+const NAV_ITEMS = [
+  { name:'dashboard', label:'Dashboard', icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>' },
+  { name:'issues', label:'All Issues', icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/></svg>' },
+  { name:'insights', label:'Insights', icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 15l4-5 3 3 5-7"/></svg>' },
+  { name:'archive', label:'Archive', icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9M10 13h4"/></svg>' },
+];
+function renderNav(){
+  const nav = document.getElementById('nav');
+  nav.innerHTML = NAV_ITEMS.map(item => {
+    let count = '';
+    if(item.name==='dashboard') count = '';
+    if(item.name==='issues') count = state.issues.filter(i=>!i.archived).length;
+    if(item.name==='archive') count = state.issues.filter(i=>i.archived).length;
+    return `<button class="nav-item ${view.name===item.name?'active':''}" data-nav="${item.name}">
+      ${item.icon}<span>${item.label}</span>${count!==''?`<span class="nav-count">${count}</span>`:''}
+    </button>`;
+  }).join('');
+  nav.querySelectorAll('[data-nav]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{ view = { name: btn.dataset.nav, issueId:null }; renderAll(); });
+  });
+}
+function goToIssue(id){ view = { name:'detail', issueId:id }; renderAll(); window.scrollTo(0,0); }
+
+/* ============================= RENDER: DASHBOARD ============================= */
+function renderDashboard(){
+  const open = state.issues.filter(i=>!i.archived && isOpen(i));
+  const all = state.issues.filter(i=>!i.archived);
+  const critical = open.filter(i=>i.priority==='CRITICAL');
+  const overdue = open.filter(i=>followUpState(i).state==='overdue');
+  const dueToday = open.filter(i=>followUpState(i).state==='today');
+  const inactive = open.filter(isInactive);
+  const now = new Date();
+  const solvedThisMonth = state.issues.filter(i=>i.solvedAt && new Date(i.solvedAt).getMonth()===now.getMonth() && new Date(i.solvedAt).getFullYear()===now.getFullYear());
+  const hour = now.getHours();
+  const greeting = hour<12?'Good morning.':hour<18?'Good afternoon.':'Good evening.';
+
+  const needsAttention = open
+    .filter(i => i.priority==='CRITICAL' || followUpState(i).state==='overdue')
+    .sort((a,b)=> attentionScore(b) - attentionScore(a))
+    .slice(0,5);
+
+  const reminders = open.filter(i=>{
+    const s = reminderState(i).state;
+    return s==='overdue' || s==='due_today' || s==='due_soon';
+  }).sort((a,b)=> daysUntil(a.dueDate) - daysUntil(b.dueDate));
+
+  const followUpToday = open.filter(i=>followUpState(i).state==='today').sort((a,b)=>a.title.localeCompare(b.title));
+  const upcoming = open.filter(i=>{
+    const d = i.nextFollowUpDate ? daysUntil(i.nextFollowUpDate) : null;
+    return d!==null && d>0 && d<=7;
+  }).sort((a,b)=> daysUntil(a.nextFollowUpDate)-daysUntil(b.nextFollowUpDate));
+  const recentlySolved = state.issues.filter(i=>i.solvedAt && !i.archived).sort((a,b)=>b.solvedAt.localeCompare(a.solvedAt)).slice(0,4);
+  const recent = [...all].sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt)).slice(0,5);
+
+  document.getElementById('view-root').innerHTML = `
+    <h1 class="page-title">${greeting}</h1>
+    <p class="page-sub">Here's what needs your attention.</p>
+
+    <div class="stat-row">
+      ${statCard(all.length,'Total Issues')}
+      ${statCard(open.length,'Open')}
+      ${statCard(critical.length,'Critical','warn')}
+      ${statCard(overdue.length,'Overdue Follow-ups', overdue.length?'warn':'')}
+      ${statCard(dueToday.length,'Follow-up Today', dueToday.length?'amber':'')}
+      ${statCard(solvedThisMonth.length,'Solved This Month','good')}
+    </div>
+
+    ${section('Needs Your Attention', needsAttention, i => attentionRow(i), 'No critical or overdue issues right now.')}
+    ${section('Reminders', reminders, i => simpleRow(i,'reminder'), 'No due dates coming up in the next 3 days.')}
+    ${section('Follow-up Today', followUpToday, i => simpleRow(i, 'today'), 'Nothing scheduled for today.')}
+    ${section('Upcoming Follow-ups (7 days)', upcoming, i => simpleRow(i,'upcoming'), 'Nothing scheduled in the coming week.')}
+    ${section('Inactive Issues', inactive.slice(0,6), i => simpleRow(i,'inactive'), 'No stale issues — everything has recent activity.', inactive.length>6)}
+    ${section('Recently Solved', recentlySolved, i => simpleRow(i,'solved'), 'No issues solved yet.')}
+    ${section('Recent Activity', recent, i => simpleRow(i,'recent'), 'No issues recorded yet.')}
+  `;
+  attachRowHandlers();
+  const seeAllBtn = document.getElementById('seeAllBtn');
+  if(seeAllBtn) seeAllBtn.addEventListener('click', ()=>{
+    filters = { status:'', priority:'', reported:'', followup:'inactive', search:'', sort:'smart' };
+    view = { name:'issues', issueId:null };
+    renderAll();
+  });
+}
+function attentionScore(i){
+  const fu = followUpState(i);
+  let score = 0;
+  if(fu.state==='overdue') score += 100 + Math.abs(daysUntil(i.nextFollowUpDate));
+  if(i.priority==='CRITICAL') score += 50;
+  return score;
+}
+function statCard(num,label,cls){
+  return `<div class="stat-card ${cls||''}"><div class="stat-num">${num}</div><div class="stat-label">${label}</div></div>`;
+}
+function section(title, items, rowFn, emptyMsg, showSeeAll){
+  return `<div class="section">
+    <div class="section-head"><h2>${title}</h2>${showSeeAll?'<button class="see-all" id="seeAllBtn">View all</button>':''}</div>
+    <div class="section-body">
+      ${items.length ? items.map(rowFn).join('') : `<div class="section-empty">${emptyMsg}</div>`}
+    </div>
+  </div>`;
+}
+function attentionRow(i){
+  const fu = followUpState(i);
+  const flag = fu.state==='overdue' ? `<span class="irow-flag flag-overdue">${fu.label}</span>` :
+               i.priority==='CRITICAL' ? `<span class="irow-flag" style="background:var(--critical-bg);color:var(--critical)">Critical</span>` : '';
+  return `<div class="irow" tabindex="0" role="link" aria-label="${esc(i.title)}" data-goto="${i.id}">
+    <div class="prio-bar ${i.priority}"></div>
+    <div class="irow-id mono">${i.issueNumber}</div>
+    <div class="irow-main">
+      <div class="irow-title">${esc(i.title)}</div>
+      <div class="irow-meta">${statusLabel(i.status)} · ${i.reported? 'Reported to '+esc(i.reportedTo||'—') : 'Not reported'} · last activity ${fmtRelative(lastActivityDate(i))}</div>
+    </div>
+    ${flag}
+  </div>`;
+}
+function simpleRow(i, kind){
+  let flag = '';
+  let extra = '';
+  if(kind==='today') flag = `<span class="irow-flag flag-today">Due today</span>`;
+  if(kind==='upcoming') flag = `<span class="irow-flag" style="background:var(--surface-2);color:var(--text-secondary)">${fmtDate(i.nextFollowUpDate)}</span>`;
+  if(kind==='reminder'){
+    const r = reminderState(i);
+    if(r.state==='overdue') flag = `<span class="irow-flag flag-overdue">Overdue ${r.days}d</span>`;
+    else if(r.state==='due_today') flag = `<span class="irow-flag flag-today">Due today</span>`;
+    else flag = `<span class="irow-flag" style="background:var(--surface-2);color:var(--text-secondary)">Due in ${r.days}d</span>`;
+    extra = `<button class="btn sm" data-snooze="${i.id}">Snooze 3d</button>`;
+  }
+  if(kind==='inactive') flag = `<span class="irow-flag flag-inactive">No activity ${daysSince(lastActivityDate(i))}d</span>`;
+  if(kind==='solved') flag = `<span class="irow-flag flag-solved">Solved ${fmtRelative(i.solvedAt)}</span>`;
+  if(kind==='recent') flag = `<span class="irow-flag" style="background:var(--surface-2);color:var(--text-muted)">${fmtRelative(i.updatedAt)}</span>`;
+  return `<div class="irow" tabindex="0" role="link" aria-label="${esc(i.title)}" data-goto="${i.id}">
+    <div class="prio-bar ${i.priority}"></div>
+    <div class="irow-id mono">${i.issueNumber}</div>
+    <div class="irow-main">
+      <div class="irow-title">${esc(i.title)}</div>
+      <div class="irow-meta">${i.reportedTo ? 'Reported to '+esc(i.reportedTo) : statusLabel(i.status)}</div>
+    </div>
+    ${flag}${extra}
+  </div>`;
+}
+function attachRowHandlers(){
+  document.querySelectorAll('[data-goto]').forEach(el=>{
+    el.addEventListener('click', ()=> goToIssue(el.dataset.goto));
+    el.addEventListener('keydown', (e)=>{ if(e.key==='Enter' || e.key===' '){ e.preventDefault(); goToIssue(el.dataset.goto); } });
+  });
+  document.querySelectorAll('[data-snooze]').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{ e.stopPropagation(); snoozeReminder(btn.dataset.snooze, 3); });
+    btn.addEventListener('keydown', (e)=> e.stopPropagation());
+  });
+}
+
+/* ============================= RENDER: ALL ISSUES ============================= */
+function sortIssues(list){
+  if(filters.sort==='newest') return [...list].sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
+  if(filters.sort==='oldest') return [...list].sort((a,b)=>a.createdAt.localeCompare(b.createdAt));
+  if(filters.sort==='updated') return [...list].sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt));
+  // smart default: overdue > critical > high > due today > oldest unresolved > recently updated
+  const rank = i => {
+    const fu = followUpState(i);
+    if(fu.state==='overdue') return 0;
+    if(i.priority==='CRITICAL') return 1;
+    if(i.priority==='HIGH') return 2;
+    if(fu.state==='today') return 3;
+    if(isOpen(i)) return 4;
+    return 5;
+  };
+  return [...list].sort((a,b)=>{
+    const r = rank(a)-rank(b);
+    if(r!==0) return r;
+    if(rank(a)===4) return daysSince(a.createdAt)>daysSince(b.createdAt)?-1:1;
+    return b.updatedAt.localeCompare(a.updatedAt);
+  });
+}
+function applyFilters(list){
+  return list.filter(i=>{
+    if(filters.status && i.status!==filters.status) return false;
+    if(filters.priority && i.priority!==filters.priority) return false;
+    if(filters.reported==='yes' && !i.reported) return false;
+    if(filters.reported==='no' && i.reported) return false;
+    if(filters.followup){
+      const fu = followUpState(i).state;
+      if(filters.followup==='inactive'){ if(!isInactive(i)) return false; }
+      else if(fu!==filters.followup) return false;
+    }
+    if(filters.search){
+      const q = filters.search.toLowerCase();
+      const hay = [i.title,i.description,i.reportedTo,i.category,i.affectedSystem, ...(i.updates||[]).map(u=>u.content)].join(' ').toLowerCase();
+      if(!hay.includes(q)) return false;
+    }
+    if(filters.dateFrom && i.createdAt.slice(0,10) < filters.dateFrom) return false;
+    if(filters.dateTo && i.createdAt.slice(0,10) > filters.dateTo) return false;
+    return true;
+  });
+}
+function renderIssuesList(){
+  const base = state.issues.filter(i=>!i.archived);
+  const filtered = sortIssues(applyFilters(base));
+  document.getElementById('view-root').innerHTML = `
+    <h1 class="page-title">All Issues</h1>
+    <p class="page-sub">${filtered.length} of ${base.length} issue${base.length===1?'':'s'}</p>
+    <div class="filters-bar">
+      ${selectFilter('status',[['','All statuses'],['NEW','New'],['REPORTED','Reported'],['IN_PROGRESS','In Progress'],['AWAITING_RESPONSE','Awaiting Response'],['ON_HOLD','On Hold'],['SOLVED','Solved'],['CLOSED','Closed']])}
+      ${selectFilter('priority',[['','All priorities'],['CRITICAL','Critical'],['HIGH','High'],['MEDIUM','Medium'],['LOW','Low']])}
+      ${selectFilter('reported',[['','Reported: any'],['yes','Reported'],['no','Not reported']])}
+      ${selectFilter('followup',[['','Follow-up: any'],['overdue','Overdue'],['today','Due today'],['upcoming','Upcoming'],['inactive','Inactive']])}
+      ${selectFilter('sort',[['smart','Sort: Smart'],['newest','Sort: Newest'],['oldest','Sort: Oldest'],['updated','Sort: Recently updated']])}
+      <input type="date" class="input" data-filter="dateFrom" value="${filters.dateFrom}" title="Created on or after">
+      <span class="cell-sub">to</span>
+      <input type="date" class="input" data-filter="dateTo" value="${filters.dateTo}" title="Created on or before">
+      ${(filters.status||filters.priority||filters.reported||filters.followup||filters.search||filters.dateFrom||filters.dateTo)?'<button class="btn sm" id="clearFilters">Clear filters</button>':''}
+      <button class="btn sm" id="exportBtn" style="margin-left:auto;">Export CSV</button>
+      <button class="btn sm" id="printBtnList">Print / Save as PDF</button>
+    </div>
+    ${selectedIds.size>0 ? `
+    <div class="section bulk-bar">
+      <strong>${selectedIds.size} selected</strong>
+      <select id="bulkPriority"><option value="">Set priority…</option><option value="CRITICAL">Critical</option><option value="HIGH">High</option><option value="MEDIUM">Medium</option><option value="LOW">Low</option></select>
+      <select id="bulkStatus"><option value="">Set status…</option><option value="IN_PROGRESS">In Progress</option><option value="AWAITING_RESPONSE">Awaiting Response</option><option value="ON_HOLD">On Hold</option><option value="SOLVED">Solved</option><option value="CLOSED">Closed</option></select>
+      <button class="btn sm" id="bulkArchiveBtn">Archive eligible</button>
+      <button class="btn sm" id="bulkClearBtn" style="margin-left:auto;">Clear selection</button>
+    </div>` : ''}
+    <div class="section">
+      ${filtered.length? `<div class="table-scroll"><table>
+        <thead><tr><th class="no-print"><input type="checkbox" id="selectAllCheckbox"></th><th>ID</th><th>Issue</th><th>Priority</th><th>Status</th><th>Reported To</th><th>Last Update</th><th>Follow-up</th><th>Age</th><th class="no-print"></th></tr></thead>
+        <tbody>
+          ${filtered.map(rowTr).join('')}
+        </tbody>
+      </table></div>` : `<div class="section-empty">No issues match these filters.</div>`}
+    </div>
+  `;
+  document.querySelectorAll('[data-filter]').forEach(sel=>{
+    sel.addEventListener('change', ()=>{ filters[sel.dataset.filter] = sel.value; renderIssuesList(); });
+  });
+  document.querySelectorAll('tr.tr-link').forEach(tr=> tr.addEventListener('click', ()=> goToIssue(tr.dataset.id)));
+  document.querySelectorAll('[data-remind]').forEach(btn=> btn.addEventListener('click', (e)=>{
+    e.stopPropagation(); openModal('reminder', btn.dataset.remind);
+  }));
+  document.querySelectorAll('.row-check').forEach(cb=>{
+    cb.addEventListener('click', (e)=> e.stopPropagation());
+    cb.addEventListener('change', ()=>{
+      if(cb.checked) selectedIds.add(cb.dataset.id); else selectedIds.delete(cb.dataset.id);
+      renderIssuesList();
+    });
+  });
+  const selectAll = document.getElementById('selectAllCheckbox');
+  if(selectAll){
+    selectAll.checked = filtered.length>0 && filtered.every(i=>selectedIds.has(i.id));
+    selectAll.addEventListener('click', (e)=> e.stopPropagation());
+    selectAll.addEventListener('change', ()=>{
+      if(selectAll.checked) filtered.forEach(i=> selectedIds.add(i.id));
+      else filtered.forEach(i=> selectedIds.delete(i.id));
+      renderIssuesList();
+    });
+  }
+  const bp = document.getElementById('bulkPriority');
+  if(bp) bp.addEventListener('change', ()=>{ if(bp.value) bulkSetPriority(Array.from(selectedIds), bp.value); });
+  const bs = document.getElementById('bulkStatus');
+  if(bs) bs.addEventListener('change', ()=>{ if(bs.value) bulkSetStatus(Array.from(selectedIds), bs.value); });
+  const baBtn = document.getElementById('bulkArchiveBtn');
+  if(baBtn) baBtn.addEventListener('click', ()=> bulkArchive(Array.from(selectedIds)));
+  const bcBtn = document.getElementById('bulkClearBtn');
+  if(bcBtn) bcBtn.addEventListener('click', ()=>{ selectedIds.clear(); renderIssuesList(); });
+  const cf = document.getElementById('clearFilters');
+  if(cf) cf.addEventListener('click', ()=>{ filters={status:'',priority:'',reported:'',followup:'',search:filters.search,sort:'smart',dateFrom:'',dateTo:''}; renderIssuesList(); });
+  document.getElementById('exportBtn').addEventListener('click', ()=> exportCSV(filtered, 'issues'));
+  document.getElementById('printBtnList').addEventListener('click', ()=> window.print());
+}
+function selectFilter(key,options){
+  return `<select data-filter="${key}">${options.map(([v,l])=>`<option value="${v}" ${filters[key]===v?'selected':''}>${l}</option>`).join('')}</select>`;
+}
+function rowTr(i){
+  const fu = followUpState(i);
+  const fuHtml = fu.state==='overdue' ? `<span style="color:var(--critical);font-weight:600;">${fu.label}</span>` :
+                 fu.state==='today' ? `<span style="color:var(--high);font-weight:600;">Due today</span>` :
+                 fu.state==='upcoming' ? fu.label : '—';
+  return `<tr class="tr-link" data-id="${i.id}">
+    <td class="no-print"><input type="checkbox" class="row-check" data-id="${i.id}" ${selectedIds.has(i.id)?'checked':''}></td>
+    <td class="mono cell-sub">${i.issueNumber}</td>
+    <td><div class="cell-title">${esc(i.title)}</div><div class="cell-sub">${isInactive(i)?'Inactive':''}</div></td>
+    <td><span class="badge ${i.priority}">${priorityLabel(i.priority)}</span></td>
+    <td><span class="badge status ${i.status}">${statusLabel(i.status)}</span></td>
+    <td>${i.reported? esc(i.reportedTo||'—') : '<span class="cell-sub">Not reported</span>'}</td>
+    <td class="cell-sub">${fmtRelative(i.updatedAt)}</td>
+    <td>${fuHtml}</td>
+    <td class="cell-sub">${ageLabel(i.createdAt)}</td>
+    <td class="no-print"><button class="btn sm icon-btn ${i.dueDate?'reminder-set':''}" data-remind="${i.id}" aria-label="${i.dueDate?'Reminder set for '+fmtDate(i.dueDate):'Set reminder'}" title="${i.dueDate?'Reminder set for '+fmtDate(i.dueDate):'Set reminder'}">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+    </button></td>
+  </tr>`;
+}
+async function bulkSetPriority(ids, priority){
+  ids.forEach(id=>{
+    const i = getIssue(id); if(!i) return;
+    const prev = i.priority; if(prev===priority) return;
+    i.priority = priority; i.updatedAt = nowISO();
+    pushHistory(i,'priority_changed',prev,priority);
+  });
+  await saveData(); selectedIds.clear(); renderIssuesList();
+  showToast(`Priority updated for ${ids.length} issue(s).`);
+}
+async function bulkSetStatus(ids, status){
+  ids.forEach(id=>{
+    const i = getIssue(id); if(!i) return;
+    const prev = i.status; if(prev===status) return;
+    i.status = status;
+    if(status==='SOLVED') i.solvedAt = nowISO();
+    if(status==='CLOSED') i.closedAt = nowISO();
+    i.updatedAt = nowISO();
+    pushHistory(i,'status_changed',prev,status);
+  });
+  await saveData(); selectedIds.clear(); renderIssuesList();
+  showToast(`Status updated for ${ids.length} issue(s).`);
+}
+async function bulkArchive(ids){
+  let count = 0;
+  ids.forEach(id=>{
+    const i = getIssue(id); if(!i || isOpen(i) || i.archived) return;
+    i.archived = true; i.updatedAt = nowISO(); pushHistory(i,'archived',null,null); count++;
+  });
+  await saveData(); selectedIds.clear(); renderIssuesList();
+  showToast(count ? `Archived ${count} issue(s).` : 'Only solved or closed issues can be archived.');
+}
+
+/* ============================= RENDER: INSIGHTS ============================= */
+function lastNMonths(n){
+  const result = [];
+  const now = new Date();
+  for(let k=n-1;k>=0;k--){
+    const d = new Date(now.getFullYear(), now.getMonth()-k, 1);
+    result.push({ key: d.toISOString().slice(0,7), label: d.toLocaleDateString('en-US',{month:'short'}) });
+  }
+  return result;
+}
+function renderBarChart(months, seriesA, seriesB){
+  const w = 640, h = 200, padTop = 10, padBottom = 26;
+  const groupW = w / months.length;
+  const barW = Math.max(8, groupW/2 - 8);
+  const maxVal = Math.max(1, ...seriesA, ...seriesB);
+  const usableH = h - padTop - padBottom;
+  let bars = '';
+  months.forEach((m,idx)=>{
+    const gx = idx*groupW + (groupW/2 - barW - 3);
+    const aH = (seriesA[idx]/maxVal) * usableH;
+    const bH = (seriesB[idx]/maxVal) * usableH;
+    bars += `<rect x="${gx}" y="${h-padBottom-aH}" width="${barW}" height="${Math.max(aH,1)}" style="fill:var(--accent)" rx="2"></rect>`;
+    bars += `<rect x="${gx+barW+6}" y="${h-padBottom-bH}" width="${barW}" height="${Math.max(bH,1)}" style="fill:var(--low)" rx="2"></rect>`;
+    bars += `<text x="${idx*groupW+groupW/2}" y="${h-8}" font-size="11" style="fill:var(--text-muted)" text-anchor="middle">${m.label}</text>`;
+  });
+  return `<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:auto;">${bars}</svg>`;
+}
+function renderInsights(){
+  const all = state.issues.filter(i=>!i.archived);
+  const solved = state.issues.filter(i=>i.solvedAt);
+  const open = all.filter(isOpen);
+  const avgResolutionDays = solved.length ? Math.round(solved.reduce((sum,i)=> sum + (new Date(i.solvedAt)-new Date(i.createdAt))/86400000, 0) / solved.length) : null;
+
+  const months = lastNMonths(6);
+  const openedByMonth = months.map(m=> state.issues.filter(i=> i.createdAt.slice(0,7)===m.key).length);
+  const solvedByMonth = months.map(m=> solved.filter(i=> i.solvedAt.slice(0,7)===m.key).length);
+
+  const reportedToCounts = {};
+  all.forEach(i=>{ if(i.reportedTo) reportedToCounts[i.reportedTo] = (reportedToCounts[i.reportedTo]||0)+1; });
+  const topReportedTo = Object.entries(reportedToCounts).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  const maxReportedCount = Math.max(1, ...topReportedTo.map(([,c])=>c));
+
+  const priorityCounts = { CRITICAL:0, HIGH:0, MEDIUM:0, LOW:0 };
+  open.forEach(i=> priorityCounts[i.priority]++);
+
+  document.getElementById('view-root').innerHTML = `
+    <h1 class="page-title">Insights</h1>
+    <p class="page-sub">A read on how issues move through FixFlow over time.</p>
+
+    <div class="stat-row" style="grid-template-columns:repeat(4,1fr);">
+      ${statCard(all.length, 'Total Issues')}
+      ${statCard(open.length, 'Currently Open')}
+      ${statCard(solved.length, 'Solved All-Time', 'good')}
+      ${statCard(avgResolutionDays===null?'—':avgResolutionDays, 'Avg. Days to Solve')}
+    </div>
+
+    <div class="section">
+      <div class="card-title">Opened vs. Solved — last 6 months</div>
+      <div style="padding:6px 18px 18px 18px;">
+        ${renderBarChart(months, openedByMonth, solvedByMonth)}
+        <div style="display:flex;gap:18px;margin-top:4px;">
+          <span class="cell-sub"><span style="display:inline-block;width:10px;height:10px;background:var(--accent);border-radius:2px;margin-right:6px;"></span>Opened</span>
+          <span class="cell-sub"><span style="display:inline-block;width:10px;height:10px;background:var(--low);border-radius:2px;margin-right:6px;"></span>Solved</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="section">
+        <div class="card-title">Busiest Reported-To Parties</div>
+        <div class="section-body">
+          ${topReportedTo.length ? topReportedTo.map(([name,count])=>`
+            <div style="padding:9px 12px;">
+              <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;">
+                <span>${esc(name)}</span><span class="cell-sub">${count}</span>
+              </div>
+              <div style="background:var(--surface-2);border-radius:4px;height:6px;overflow:hidden;">
+                <div style="width:${(count/maxReportedCount)*100}%;height:100%;background:var(--accent);"></div>
+              </div>
+            </div>`).join('') : '<div class="section-empty">Nothing reported yet.</div>'}
+        </div>
+      </div>
+      <div class="section">
+        <div class="card-title">Open Issues by Priority</div>
+        <div class="kv" style="padding-top:6px;grid-template-columns:110px 1fr;">
+          <dt>Critical</dt><dd><span class="badge CRITICAL">${priorityCounts.CRITICAL}</span></dd>
+          <dt>High</dt><dd><span class="badge HIGH">${priorityCounts.HIGH}</span></dd>
+          <dt>Medium</dt><dd><span class="badge MEDIUM">${priorityCounts.MEDIUM}</span></dd>
+          <dt>Low</dt><dd><span class="badge LOW">${priorityCounts.LOW}</span></dd>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+/* ============================= RENDER: ARCHIVE ============================= */
+function renderArchive(){
+  const archived = state.issues.filter(i=>i.archived).sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt));
+  document.getElementById('view-root').innerHTML = `
+    <h1 class="page-title">Archive</h1>
+    <p class="page-sub">${archived.length} archived issue${archived.length===1?'':'s'} — still searchable, kept out of your active list.</p>
+    ${archived.length? `<div class="btn-row" style="margin-bottom:14px;"><button class="btn sm" id="exportArchiveBtn">Export CSV</button></div>` : ''}
+    <div class="section">
+      ${archived.length? `<table>
+        <thead><tr><th>ID</th><th>Issue</th><th>Priority</th><th>Status</th><th>Solved</th><th></th></tr></thead>
+        <tbody>${archived.map(i=>`
+          <tr>
+            <td class="mono cell-sub">${i.issueNumber}</td>
+            <td class="tr-link" data-id="${i.id}"><div class="cell-title">${esc(i.title)}</div></td>
+            <td><span class="badge ${i.priority}">${priorityLabel(i.priority)}</span></td>
+            <td><span class="badge status ${i.status}">${statusLabel(i.status)}</span></td>
+            <td class="cell-sub">${fmtDate(i.solvedAt)}</td>
+            <td><button class="btn sm" data-restore="${i.id}">Restore</button></td>
+          </tr>`).join('')}</tbody>
+      </table>` : `<div class="section-empty">Nothing archived yet. Solved and closed issues can be archived from their detail page.</div>`}
+    </div>
+  `;
+  document.querySelectorAll('td.tr-link').forEach(td=> td.addEventListener('click', ()=> goToIssue(td.dataset.id)));
+  const exportArchiveBtn = document.getElementById('exportArchiveBtn');
+  if(exportArchiveBtn) exportArchiveBtn.addEventListener('click', ()=> exportCSV(archived, 'archive'));
+  document.querySelectorAll('[data-restore]').forEach(btn=> btn.addEventListener('click', async (e)=>{
+    e.stopPropagation();
+    const i = getIssue(btn.dataset.restore); i.archived=false; i.updatedAt=nowISO();
+    pushHistory(i,'restored',null,null);
+    await saveData(); renderArchive(); renderNav(); showToast('Issue restored.');
+  }));
+}
+
+/* ============================= RENDER: ISSUE DETAIL ============================= */
+function renderDetail(){
+  const i = getIssue(view.issueId);
+  if(!i){ view={name:'dashboard'}; renderAll(); return; }
+  const fu = followUpState(i);
+  const timeline = buildTimeline(i);
+
+  document.getElementById('view-root').innerHTML = `
+    <button class="btn sm" id="backBtn" style="margin-bottom:14px;">← Back</button>
+    <div class="detail-header">
+      <div>
+        <div class="detail-idline mono">${i.issueNumber}${i.archived?' · Archived':''}</div>
+        <h1 class="detail-title">${esc(i.title)}</h1>
+        <div class="detail-badges">
+          <span class="badge ${i.priority}">${priorityLabel(i.priority)}</span>
+          <span class="badge status ${i.status}">${statusLabel(i.status)}</span>
+          <span class="badge" style="background:var(--surface-2);color:var(--text-secondary);border:1px solid var(--border);">
+            <span class="dot ${i.reported?'rep-yes':'rep-no'}"></span> ${i.reported?'Reported':'Not reported'}
+          </span>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn sm" data-modal="update">+ Add Update</button>
+        <button class="btn sm icon-btn ${i.dueDate?'reminder-set':''}" data-modal="reminder" aria-label="${i.dueDate?'Reminder set for '+fmtDate(i.dueDate):'Set reminder'}" title="${i.dueDate?'Reminder set for '+fmtDate(i.dueDate):'Set reminder'}">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        </button>
+        <button class="btn sm" data-modal="edit">Edit</button>
+        <button class="btn sm" id="printBtnDetail">Print / Save as PDF</button>
+      </div>
+    </div>
+
+    <div class="btn-row" style="margin-bottom:22px;">
+      ${!i.reported? `<button class="btn sm primary" data-modal="report">Mark Reported</button>` : ''}
+      ${i.status!=='IN_PROGRESS' && isOpen(i) ? `<button class="btn sm" data-status="IN_PROGRESS">Mark In Progress</button>`:''}
+      ${i.status!=='AWAITING_RESPONSE' && isOpen(i) ? `<button class="btn sm" data-status="AWAITING_RESPONSE">Awaiting Response</button>`:''}
+      ${i.status!=='ON_HOLD' && isOpen(i) ? `<button class="btn sm" data-status="ON_HOLD">Put On Hold</button>`:''}
+      ${isOpen(i) ? `<button class="btn sm primary" data-status="SOLVED">Mark Solved</button>`:''}
+      ${i.status==='SOLVED' ? `<button class="btn sm primary" data-status="CLOSED">Close Issue</button>`:''}
+      ${!isOpen(i) ? `<button class="btn sm" data-status="REPORTED">Reopen</button>`:''}
+      ${!isOpen(i) && !i.archived ? `<button class="btn sm" data-archive="1">Archive</button>`:''}
+    </div>
+
+    <div class="grid-2">
+      <div>
+        <div class="section">
+          <div class="card-title">Description</div>
+          <div class="card-text">${esc(i.description) || '<span style="color:var(--text-muted)">No description provided.</span>'}</div>
+        </div>
+
+        <div class="section">
+          <div class="section-head"><h2>Timeline</h2></div>
+          <div class="timeline">
+            ${timeline.length? timeline.map(tlItem).join('') : '<div class="section-empty">No activity yet.</div>'}
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-head"><h2>Attachments</h2><button class="see-all" data-modal="attach">Add</button></div>
+          <div class="section-body">
+            ${ (i.attachments||[]).length ? (i.attachments||[]).map(a=> a.fileType==='image' ? `
+              <div class="attach-item">
+                <span class="attach-thumb" data-imgkey="${a.storageKey}" data-attname="${esc(a.fileName)}">${esc(a.fileName)}</span>
+                <button class="attach-remove" data-removeattach="${a.id}">×</button>
+              </div>` : `
+              <div class="attach-item">
+                ${a.fileUrl ? `<a href="${esc(a.fileUrl)}" target="_blank" rel="noopener">${esc(a.fileName)}</a>` : esc(a.fileName)}
+                <button class="attach-remove" data-removeattach="${a.id}">×</button>
+              </div>`).join('')
+              : '<div class="section-empty">No attachments yet. Upload images or link a file.</div>' }
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="section">
+          <div class="card-title">Reporting</div>
+          <div class="kv" style="padding-top:4px;">
+            <dt>Reported</dt><dd>${i.reported?'Yes':'No'}</dd>
+            ${i.reported?`<dt>Reported To</dt><dd>${esc(i.reportedTo||'—')}</dd>
+            <dt>Date Reported</dt><dd>${fmtDate(i.dateReported)}</dd>
+            <dt>Method</dt><dd>${esc(i.methodOfReport)||'—'}</dd>
+            <dt>Reference</dt><dd>${esc(i.referenceInfo)||'—'}</dd>
+            ${i.initialResponse?`<dt>Initial Response</dt><dd>${esc(i.initialResponse)}</dd>`:''}`:''}
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="card-title">Last Action</div>
+          <div class="card-text" style="padding-top:0;">${esc(i.lastAction) || '<span style="color:var(--text-muted)">None recorded yet.</span>'}
+            ${i.lastActionAt?`<div class="cell-sub" style="margin-top:6px;">${fmtDateTime(i.lastActionAt)}</div>`:''}
+          </div>
+          <div class="card-title">Next Action</div>
+          <div class="card-text" style="padding-top:0;">${esc(i.nextAction) || '<span style="color:var(--text-muted)">Not set.</span>'}</div>
+        </div>
+
+        <div class="section">
+          <div class="card-title">Follow-up</div>
+          <div class="followup-box">
+            <div class="followup-status ${fu.state}">${fu.state==='none'?'No follow-up scheduled':fu.label}</div>
+            ${i.nextFollowUpDate?`<div class="cell-sub">Scheduled for ${fmtDate(i.nextFollowUpDate)}</div>`:''}
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-head"><h2>Due Date</h2><button class="see-all" data-modal="reminder">Set</button></div>
+          <div class="followup-box">
+            <div class="followup-status ${reminderCssClass(reminderState(i).state)}">${reminderLabel(i)}</div>
+            ${i.dueDate?`<div class="cell-sub">Scheduled for ${fmtDate(i.dueDate)}</div>
+            <div class="btn-row" style="margin-top:10px;">
+              <button class="btn sm" data-snooze="${i.id}" data-snoozedays="1">+1 day</button>
+              <button class="btn sm" data-snooze="${i.id}" data-snoozedays="3">+3 days</button>
+              <button class="btn sm" data-snooze="${i.id}" data-snoozedays="7">+7 days</button>
+            </div>`:''}
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="card-title">Details</div>
+          <div class="kv" style="padding-top:4px;">
+            <dt>Category</dt><dd>${esc(i.category)||'—'}</dd>
+            <dt>System</dt><dd>${esc(i.affectedSystem)||'—'}</dd>
+            <dt>Identified</dt><dd>${fmtDate(i.dateIdentified)}</dd>
+            <dt>Age</dt><dd>${ageLabel(i.dateIdentified)}</dd>
+            ${i.solvedAt?`<dt>Solved</dt><dd>${fmtDate(i.solvedAt)}</dd>`:''}
+            ${i.closedAt?`<dt>Closed</dt><dd>${fmtDate(i.closedAt)}</dd>`:''}
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  document.getElementById('backBtn').addEventListener('click', ()=>{ view={name:'issues'}; renderAll(); });
+  document.getElementById('printBtnDetail').addEventListener('click', ()=> window.print());
+  document.querySelectorAll('[data-modal]').forEach(btn=> btn.addEventListener('click', ()=> openModal(btn.dataset.modal, i.id)));
+  document.querySelectorAll('[data-status]').forEach(btn=> btn.addEventListener('click', ()=> changeStatus(i.id, btn.dataset.status)));
+  const archBtn = document.querySelector('[data-archive]');
+  if(archBtn) archBtn.addEventListener('click', ()=> archiveIssue(i.id));
+  document.querySelectorAll('[data-removeattach]').forEach(btn=> btn.addEventListener('click', ()=> removeAttachment(i.id, btn.dataset.removeattach)));
+  document.querySelectorAll('[data-snooze]').forEach(btn=> btn.addEventListener('click', ()=> snoozeReminder(btn.dataset.snooze, parseInt(btn.dataset.snoozedays,10))));
+  loadAttachmentThumbnails();
+}
+function buildTimeline(i){
+  const items = [];
+  (i.history||[]).forEach(h=> items.push({ date:h.createdAt, type:'history', data:h }));
+  (i.updates||[]).forEach(u=> items.push({ date:u.createdAt, type:'update', data:u }));
+  return items.sort((a,b)=> b.date.localeCompare(a.date));
+}
+function tlItem(entry){
+  const d = new Date(entry.date);
+  const dateStr = d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  if(entry.type==='history'){
+    const h = entry.data;
+    const labels = {
+      created:'Issue created', reported:'Reported', status_changed:'Status changed',
+      update_added:'Update added', archived:'Archived', restored:'Restored', attachment_added:'Attachment added',
+      reminder_set:'Reminder set', priority_changed:'Priority changed'
+    };
+    let detail = '';
+    if(h.action==='status_changed') detail = `<span class="field">${statusLabel(h.previousValue)} → ${statusLabel(h.newValue)}</span>`;
+    if(h.action==='priority_changed') detail = `<span class="field">${priorityLabel(h.previousValue)} → ${priorityLabel(h.newValue)}</span>`;
+    if(h.action==='reported') detail = `<span class="field">Reported to ${esc(h.newValue)}</span>`;
+    if(h.action==='reminder_set') detail = `<span class="field">Due ${fmtDate(h.newValue)}</span>`;
+    return `<div class="tl-item"><div class="tl-date">${dateStr}</div><div class="tl-body">
+      <div class="tl-label">${labels[h.action]||h.action}</div>
+      ${detail?`<div class="tl-detail">${detail}</div>`:''}
+    </div></div>`;
+  } else {
+    const u = entry.data;
+    return `<div class="tl-item"><div class="tl-date">${dateStr}</div><div class="tl-body">
+      <div class="tl-label">Update added</div>
+      <div class="tl-detail">${esc(u.content)}</div>
+      ${u.contactedWho?`<div class="tl-detail"><span class="field">Contacted:</span> ${esc(u.contactedWho)}</div>`:''}
+      ${u.responseReceived?`<div class="tl-detail"><span class="field">Response:</span> ${esc(u.responseReceived)}</div>`:''}
+      ${u.followUpDate?`<div class="tl-detail"><span class="field">Next follow-up:</span> ${fmtDate(u.followUpDate)}</div>`:''}
+    </div></div>`;
+  }
+}
+
+/* ============================= ACTIONS ============================= */
+async function createIssue(data, files){
+  const issue = {
+    id: uid(), issueNumber: nextIssueNumber(), title: data.title, description: data.description||'',
+    priority: data.priority, status:'NEW', category: data.category||'', affectedSystem: data.affectedSystem||'',
+    reported:false, reportedTo:'', dateReported:null, methodOfReport:'', referenceInfo:'', initialResponse:'',
+    lastAction:'', lastActionAt:null, nextAction:'', nextFollowUpDate:null,
+    dueDate: data.dueDate || null, reminderNotified: [],
+    dateIdentified: data.dateIdentified || todayISO(), createdAt: nowISO(), updatedAt: nowISO(),
+    solvedAt:null, closedAt:null, archived:false, updates:[], history:[], attachments:[]
+  };
+  pushHistory(issue,'created',null,null);
+  await attachImageFiles(issue, files);
+  state.issues.unshift(issue);
+  state.nextNum += 1;
+  await saveData();
+  goToIssue(issue.id);
+  showToast(`${issue.issueNumber} created.`);
+  checkReminders();
+}
+async function editIssue(id, data){
+  const i = getIssue(id);
+  Object.assign(i, { title:data.title, description:data.description, priority:data.priority,
+    category:data.category, affectedSystem:data.affectedSystem, dateIdentified:data.dateIdentified });
+  applyDueDate(i, data.dueDate);
+  i.updatedAt = nowISO();
+  await saveData(); renderAll(); showToast('Issue updated.');
+  checkReminders();
+}
+async function markReported(id, data){
+  const i = getIssue(id);
+  i.reported = true; i.reportedTo = data.reportedTo; i.dateReported = data.dateReported || todayISO();
+  i.methodOfReport = data.methodOfReport||''; i.referenceInfo = data.referenceInfo||''; i.initialResponse = data.initialResponse||'';
+  if(i.status==='NEW') i.status = 'REPORTED';
+  i.lastAction = `Reported to ${data.reportedTo}`; i.lastActionAt = nowISO();
+  i.updatedAt = nowISO();
+  pushHistory(i,'reported',null,data.reportedTo);
+  await saveData(); renderAll(); showToast('Marked as reported.');
+}
+async function addUpdate(id, data){
+  const i = getIssue(id);
+  i.updates = i.updates || [];
+  i.updates.push({ id:uid(), content:data.content, contactedWho:data.contactedWho||'', responseReceived:data.responseReceived||'',
+    actionTaken:data.actionTaken||'', nextAction:data.nextAction||'', followUpDate:data.followUpDate||null, createdAt: nowISO() });
+  i.lastAction = data.actionTaken || data.content;
+  i.lastActionAt = nowISO();
+  if(data.nextAction) i.nextAction = data.nextAction;
+  if(data.followUpDate) i.nextFollowUpDate = data.followUpDate;
+  if(i.status==='NEW' && i.reported) i.status='IN_PROGRESS';
+  i.updatedAt = nowISO();
+  pushHistory(i,'update_added',null,null);
+  await saveData(); renderAll(); showToast('Update added.');
+}
+async function changeStatus(id, newStatus){
+  const i = getIssue(id);
+  const prev = i.status;
+  if(prev===newStatus) return;
+  i.status = newStatus;
+  if(newStatus==='SOLVED') i.solvedAt = nowISO();
+  if(newStatus==='CLOSED') i.closedAt = nowISO();
+  if(newStatus==='REPORTED'){ i.solvedAt=null; i.closedAt=null; }
+  i.updatedAt = nowISO();
+  pushHistory(i,'status_changed',prev,newStatus);
+  await saveData(); renderAll(); showToast(`Status changed to ${statusLabel(newStatus)}.`);
+}
+async function archiveIssue(id){
+  const i = getIssue(id); i.archived = true; i.updatedAt = nowISO();
+  pushHistory(i,'archived',null,null);
+  await saveData(); view={name:'issues'}; renderAll(); showToast('Issue archived.');
+}
+async function setReminder(id, data){
+  try{
+    const i = getIssue(id);
+    if(!i){ showToast('That issue could not be found — try refreshing.', true); return; }
+    if(!data.dueDate){ showToast('Pick a due date first.', true); return; }
+    applyDueDate(i, data.dueDate);
+    i.updatedAt = nowISO();
+    pushHistory(i,'reminder_set',null,data.dueDate);
+    await saveData();
+    if(view.name==='detail') renderDetail(); else renderAll();
+    showToast('Reminder set for ' + fmtDate(data.dueDate) + '.');
+    checkReminders();
+  }catch(e){
+    showToast('Could not set reminder: ' + (e && e.message ? e.message : 'unknown error'), true);
+    console.error('FixFlow setReminder error:', e);
+  }
+}
+async function snoozeReminder(id, days){
+  try{
+    const i = getIssue(id);
+    if(!i || !i.dueDate) return;
+    const d = new Date(i.dueDate + 'T00:00:00');
+    d.setDate(d.getDate() + days);
+    const newDate = d.toISOString().slice(0,10);
+    applyDueDate(i, newDate);
+    i.updatedAt = nowISO();
+    pushHistory(i,'reminder_set',null,newDate);
+    await saveData();
+    if(view.name==='detail') renderDetail(); else renderAll();
+    showToast(`Snoozed to ${fmtDate(newDate)}.`);
+  }catch(e){
+    showToast('Could not snooze reminder: ' + (e && e.message ? e.message : 'unknown error'), true);
+    console.error('FixFlow snoozeReminder error:', e);
+  }
+}
+function requestNotificationPermission(){
+  if('Notification' in window && Notification.permission==='default'){
+    Notification.requestPermission().catch(()=>{});
+  }
+}
+function notifyReminder(msg){
+  showToast(msg);
+  if('Notification' in window && Notification.permission==='granted'){
+    try{ new Notification('Notepad FixFlow', { body: msg }); }catch(e){ /* ignore */ }
+  }
+}
+async function checkReminders(){
+  const today = todayISO();
+  let changed = false;
+  for(const i of state.issues){
+    if(i.archived || !isOpen(i) || !i.dueDate) continue;
+    const d = daysUntil(i.dueDate);
+    i.reminderNotified = i.reminderNotified || [];
+    if((d===3 || d===0) && !i.reminderNotified.includes(today)){
+      const msg = d===0 ? `${i.issueNumber} is due today — ${i.title}` : `${i.issueNumber} is due in 3 days — ${i.title}`;
+      notifyReminder(msg);
+      i.reminderNotified.push(today);
+      changed = true;
+    }
+  }
+  if(changed) await saveData();
+}
+async function attachImageFiles(issue, files){
+  if(!files || !files.length) return;
+  issue.attachments = issue.attachments || [];
+  for(const file of files){
+    try{
+      const dataUrl = await readImageFile(file);
+      const attId = uid();
+      const key = 'fixflow-img-' + attId;
+      await window.storage.set(key, dataUrl, false);
+      issue.attachments.push({ id:attId, fileName:file.name, fileType:'image', storageKey:key, createdAt: nowISO() });
+      pushHistory(issue,'attachment_added',null,file.name);
+    }catch(e){
+      showToast('Could not attach image: ' + file.name, true);
+    }
+  }
+}
+function readImageFile(file){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error);
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = reject;
+      img.onload = () => {
+        const maxDim = 1600;
+        let { width, height } = img;
+        if(width > maxDim || height > maxDim){
+          const scale = maxDim / Math.max(width, height);
+          width = Math.round(width*scale); height = Math.round(height*scale);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width; canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.82));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+function loadAttachmentThumbnails(){
+  document.querySelectorAll('.attach-thumb[data-imgkey]').forEach(async el=>{
+    const key = el.dataset.imgkey;
+    try{
+      const res = await window.storage.get(key, false);
+      if(res && res.value){
+        el.innerHTML = `<img src="${res.value}" alt="${el.dataset.attname}">`;
+        el.querySelector('img').addEventListener('click', ()=> openImagePreview(res.value));
+        el.append(document.createTextNode(el.dataset.attname));
+      }
+    }catch(e){ /* leave filename text as fallback */ }
+  });
+}
+function openImagePreview(dataUrl){
+  const root = document.getElementById('modal-root');
+  root.innerHTML = `<div class="overlay" id="overlay"><div class="modal" style="max-width:90vw;background:transparent;box-shadow:none;">
+    <img src="${dataUrl}" style="max-width:100%;max-height:85vh;border-radius:8px;display:block;margin:0 auto;">
+  </div></div>`;
+  document.getElementById('overlay').addEventListener('click', closeModal);
+  document.addEventListener('keydown', escCloseOnce);
+}
+async function addAttachments(id, files, fileName, fileUrl){
+  if((!files || !files.length) && !fileName){
+    showToast('Add an image or a file name first.', true);
+    return;
+  }
+  const i = getIssue(id);
+  await attachImageFiles(i, files);
+  if(fileName){
+    i.attachments = i.attachments || [];
+    i.attachments.push({ id:uid(), fileName, fileType:'link', fileUrl: fileUrl||'', createdAt: nowISO() });
+    pushHistory(i,'attachment_added',null,fileName);
+  }
+  i.updatedAt = nowISO();
+  await saveData(); renderDetail(); showToast('Attachment added.');
+}
+async function removeAttachment(id, attachId){
+  const i = getIssue(id);
+  const att = (i.attachments||[]).find(a=>a.id===attachId);
+  i.attachments = (i.attachments||[]).filter(a=>a.id!==attachId);
+  i.updatedAt = nowISO();
+  await saveData(); renderDetail();
+  if(att && att.storageKey){
+    try{ await window.storage.delete(att.storageKey, false); }catch(e){ /* best effort */ }
+  }
+}
+
+/* ============================= EXPORT (CSV) ============================= */
+function exportCSV(list, label){
+  label = label || 'issues';
+  const cols = ['Issue ID','Title','Priority','Status','Reported','Reported To','Date Reported','Last Action','Last Updated','Next Action','Next Follow-up','Category','System','Age (days)'];
+  const rows = list.map(i=>[
+    i.issueNumber, i.title, priorityLabel(i.priority), statusLabel(i.status), i.reported?'Yes':'No',
+    i.reportedTo||'', i.dateReported? fmtDate(i.dateReported):'', i.lastAction||'', i.updatedAt? fmtDate(i.updatedAt):'',
+    i.nextAction||'', i.nextFollowUpDate? fmtDate(i.nextFollowUpDate):'', i.category||'', i.affectedSystem||'', daysSince(i.dateIdentified)
+  ]);
+  const csv = [cols, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], { type:'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `fixflow-${label}-${todayISO()}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+  showToast('Export downloaded.');
+}
+
+/* ============================= MODALS ============================= */
+function openModal(type, issueId){
+  const root = document.getElementById('modal-root');
+  const i = issueId ? getIssue(issueId) : null;
+  if(issueId && !i){
+    showToast('That issue could not be found — try refreshing.', true);
+    return;
+  }
+  let html = '';
+  if(type==='new') html = modalNewIssue();
+  if(type==='edit') html = modalEditIssue(i);
+  if(type==='update') html = modalAddUpdate(i);
+  if(type==='report') html = modalMarkReported(i);
+  if(type==='attach') html = modalAttach(i);
+  if(type==='reminder') html = modalSetReminder(i);
+  if(type==='backup') html = modalBackup();
+  root.innerHTML = `<div class="overlay" id="overlay">${html}</div>`;
+  document.getElementById('overlay').addEventListener('click', (e)=>{ if(e.target.id==='overlay') closeModal(); });
+  document.addEventListener('keydown', escCloseOnce);
+  const closeBtn = root.querySelector('.modal-close'); if(closeBtn) closeBtn.addEventListener('click', closeModal);
+  const cancelBtn = root.querySelector('[data-cancel]'); if(cancelBtn) cancelBtn.addEventListener('click', closeModal);
+  const first = root.querySelector('input,textarea,select'); if(first) setTimeout(()=>first.focus(),50);
+  bindModalSubmit(type, issueId);
+  if(type==='backup') bindBackupModal();
+}
+function escCloseOnce(e){ if(e.key==='Escape'){ closeModal(); } }
+function closeModal(){
+  document.getElementById('modal-root').innerHTML = '';
+  document.removeEventListener('keydown', escCloseOnce);
+}
+
+/* ---- Command palette (Ctrl/Cmd+K) ---- */
+function openCommandPalette(){
+  const root = document.getElementById('modal-root');
+  root.innerHTML = `<div class="overlay" id="overlay">
+    <div class="modal" style="max-width:480px;">
+      <div class="modal-body" style="padding:12px;">
+        <input type="text" id="paletteInput" class="input" style="width:100%;font-size:14px;padding:10px 12px;" placeholder="Jump to an issue by number or title…">
+        <div id="paletteResults" style="margin-top:8px;max-height:340px;overflow-y:auto;"></div>
+      </div>
+    </div>
+  </div>`;
+  document.getElementById('overlay').addEventListener('click', (e)=>{ if(e.target.id==='overlay') closeModal(); });
+  document.addEventListener('keydown', escCloseOnce);
+  const input = document.getElementById('paletteInput');
+  setTimeout(()=> input.focus(), 30);
+  let activeIndex = 0;
+  function currentMatches(){
+    const q = input.value.toLowerCase();
+    return state.issues.filter(i=> !i.archived && (i.issueNumber.toLowerCase().includes(q) || i.title.toLowerCase().includes(q))).slice(0,8);
+  }
+  function renderResults(){
+    const matches = currentMatches();
+    document.getElementById('paletteResults').innerHTML = matches.length ? matches.map((i,idx)=>`
+      <div class="irow ${idx===activeIndex?'palette-active':''}" data-goto="${i.id}" style="cursor:pointer;">
+        <div class="prio-bar ${i.priority}"></div>
+        <div class="irow-id mono">${i.issueNumber}</div>
+        <div class="irow-main"><div class="irow-title">${esc(i.title)}</div><div class="irow-meta">${statusLabel(i.status)}</div></div>
+      </div>`).join('') : '<div class="section-empty">No matches.</div>';
+    document.querySelectorAll('#paletteResults [data-goto]').forEach(el=>{
+      el.addEventListener('click', ()=>{ closeModal(); goToIssue(el.dataset.goto); });
+    });
+  }
+  input.addEventListener('input', ()=>{ activeIndex = 0; renderResults(); });
+  input.addEventListener('keydown', (e)=>{
+    const matches = currentMatches();
+    if(e.key==='ArrowDown'){ e.preventDefault(); activeIndex = Math.min(activeIndex+1, matches.length-1); renderResults(); }
+    else if(e.key==='ArrowUp'){ e.preventDefault(); activeIndex = Math.max(activeIndex-1, 0); renderResults(); }
+    else if(e.key==='Enter'){ e.preventDefault(); const m = matches[activeIndex]; if(m){ closeModal(); goToIssue(m.id); } }
+  });
+  renderResults();
+}
+
+/* ---- Backup & Restore ---- */
+function modalBackup(){
+  return `<div class="modal">
+    <div class="modal-head"><h3>Backup &amp; Restore</h3><button class="modal-close">×</button></div>
+    <div class="modal-body">
+      <div class="field-row">
+        <label>Download a full backup</label>
+        <button class="btn" id="downloadBackupBtn" style="width:100%;">Download Backup (.json)</button>
+        <div class="hint">Save this somewhere safe — it's the only way to move your issues to another browser or computer, or recover them if something goes wrong.</div>
+      </div>
+      <div class="field-row" style="margin-top:20px;">
+        <label>Restore from a backup file</label>
+        <input type="file" id="restoreFileInput" accept="application/json">
+        <div class="hint">This replaces everything currently in FixFlow with the contents of the backup file.</div>
+      </div>
+    </div>
+    <div class="modal-foot"><button type="button" class="btn" data-cancel>Close</button></div>
+  </div>`;
+}
+function bindBackupModal(){
+  document.getElementById('downloadBackupBtn').addEventListener('click', downloadBackup);
+  document.getElementById('restoreFileInput').addEventListener('change', handleRestoreFile);
+}
+function downloadBackup(){
+  const payload = JSON.stringify(state, null, 2);
+  const blob = new Blob([payload], { type:'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `fixflow-backup-${todayISO()}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+  showToast('Backup downloaded.');
+}
+function handleRestoreFile(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  if(!confirm('This will replace everything currently in FixFlow with this backup file. Continue?')){
+    e.target.value = '';
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = async ()=>{
+    try{
+      const parsed = JSON.parse(reader.result);
+      if(!parsed || !Array.isArray(parsed.issues)) throw new Error('Unrecognized backup format');
+      state = parsed;
+      await saveData();
+      closeModal();
+      view = { name:'dashboard', issueId:null };
+      renderAll();
+      showToast('Backup restored.');
+    }catch(err){
+      showToast('Could not read that backup file.', true);
+    }
+  };
+  reader.readAsText(file);
+}
+function modalNewIssue(){
+  return `<div class="modal">
+    <div class="modal-head"><h3>New Issue</h3><button class="modal-close">×</button></div>
+    <form id="formNew">
+      <div class="modal-body">
+        <div class="field-row"><label>Title <span class="req">*</span></label><input type="text" name="title" required maxlength="140" placeholder="e.g. GLT2 session timeout during BOE processing"></div>
+        <div class="field-row"><label>Description</label><textarea name="description" placeholder="What's happening?"></textarea></div>
+        <div class="field-row"><label>Priority <span class="req">*</span></label>
+          <select name="priority" required>
+            <option value="CRITICAL">Critical</option><option value="HIGH">High</option>
+            <option value="MEDIUM" selected>Medium</option><option value="LOW">Low</option>
+          </select>
+        </div>
+        <div class="field-row"><label>Due Date</label><input type="date" name="dueDate">
+          <div class="hint">Optional — you'll get a reminder 3 days before this date and again on the day it's due.</div>
+        </div>
+        <div class="field-row"><label>Images</label><input type="file" name="images" accept="image/*" multiple>
+          <div class="hint">Optional — screenshots or photos are compressed and stored inside this file automatically.</div>
+        </div>
+        <div class="hint">You can add category, system, and reporting details later from the issue page.</div>
+      </div>
+      <div class="modal-foot"><button type="button" class="btn" data-cancel>Cancel</button><button type="submit" class="btn primary">Create Issue</button></div>
+    </form>
+  </div>`;
+}
+function modalEditIssue(i){
+  return `<div class="modal">
+    <div class="modal-head"><h3>Edit Issue</h3><button class="modal-close">×</button></div>
+    <form id="formEdit">
+      <div class="modal-body">
+        <div class="field-row"><label>Title</label><input type="text" name="title" required value="${esc(i.title)}"></div>
+        <div class="field-row"><label>Description</label><textarea name="description">${esc(i.description)}</textarea></div>
+        <div class="field-2col">
+          <div class="field-row"><label>Priority</label>
+            <select name="priority">
+              ${['CRITICAL','HIGH','MEDIUM','LOW'].map(p=>`<option value="${p}" ${i.priority===p?'selected':''}>${priorityLabel(p)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="field-row"><label>Date Identified</label><input type="date" name="dateIdentified" value="${i.dateIdentified? i.dateIdentified.slice(0,10):''}"></div>
+        </div>
+        <div class="field-2col">
+          <div class="field-row"><label>Category</label><input type="text" name="category" value="${esc(i.category)}" list="categoryOptions">${datalistOptions('categoryOptions','category')}</div>
+          <div class="field-row"><label>Affected System</label><input type="text" name="affectedSystem" value="${esc(i.affectedSystem)}" list="systemOptions">${datalistOptions('systemOptions','affectedSystem')}</div>
+        </div>
+        <div class="field-row"><label>Due Date</label><input type="date" name="dueDate" value="${i.dueDate? i.dueDate.slice(0,10):''}"></div>
+      </div>
+      <div class="modal-foot"><button type="button" class="btn" data-cancel>Cancel</button><button type="submit" class="btn primary">Save Changes</button></div>
+    </form>
+  </div>`;
+}
+function modalAddUpdate(i){
+  return `<div class="modal">
+    <div class="modal-head"><h3>Add Update — ${i.issueNumber}</h3><button class="modal-close">×</button></div>
+    <form id="formUpdate">
+      <div class="modal-body">
+        <div class="field-row"><label>What happened <span class="req">*</span></label><textarea name="content" required placeholder="e.g. Contacted the development team — they've reproduced the issue and are investigating."></textarea></div>
+        <div class="field-2col">
+          <div class="field-row"><label>Contacted</label><input type="text" name="contactedWho" placeholder="Who did you speak with?"></div>
+          <div class="field-row"><label>Response received</label><input type="text" name="responseReceived"></div>
+        </div>
+        <div class="field-row"><label>Action taken (shown as Last Action)</label><input type="text" name="actionTaken" placeholder="e.g. Escalated to vendor support"></div>
+        <div class="field-2col">
+          <div class="field-row"><label>Next action</label><input type="text" name="nextAction" placeholder="e.g. Follow up on fix timeline"></div>
+          <div class="field-row"><label>Next follow-up date</label><input type="date" name="followUpDate"></div>
+        </div>
+      </div>
+      <div class="modal-foot"><button type="button" class="btn" data-cancel>Cancel</button><button type="submit" class="btn primary">Save Update</button></div>
+    </form>
+  </div>`;
+}
+function modalMarkReported(i){
+  return `<div class="modal">
+    <div class="modal-head"><h3>Mark Reported — ${i.issueNumber}</h3><button class="modal-close">×</button></div>
+    <form id="formReport">
+      <div class="modal-body">
+        <div class="field-row"><label>Reported to <span class="req">*</span></label><input type="text" name="reportedTo" required placeholder="e.g. Chinese Development Team, IT Department, Vendor" list="reportedToOptions">${datalistOptions('reportedToOptions','reportedTo')}</div>
+        <div class="field-2col">
+          <div class="field-row"><label>Date reported</label><input type="date" name="dateReported" value="${todayISO()}"></div>
+          <div class="field-row"><label>Method</label><input type="text" name="methodOfReport" placeholder="Email, call, ticket…"></div>
+        </div>
+        <div class="field-row"><label>Reference / contact info</label><input type="text" name="referenceInfo" placeholder="Ticket #, contact name, etc."></div>
+        <div class="field-row"><label>Initial response (if any)</label><textarea name="initialResponse"></textarea></div>
+      </div>
+      <div class="modal-foot"><button type="button" class="btn" data-cancel>Cancel</button><button type="submit" class="btn primary">Mark Reported</button></div>
+    </form>
+  </div>`;
+}
+function modalAttach(i){
+  return `<div class="modal">
+    <div class="modal-head"><h3>Add Attachment — ${i.issueNumber}</h3><button class="modal-close">×</button></div>
+    <form id="formAttach">
+      <div class="modal-body">
+        <div class="field-row"><label>Upload images</label><input type="file" name="images" accept="image/*" multiple>
+          <div class="hint">Compressed and stored inside this file automatically.</div>
+        </div>
+        <div class="field-row" style="margin-top:18px;"><label>Or link a file</label><input type="text" name="fileName" placeholder="File name, e.g. report.pdf"></div>
+        <div class="field-row"><label>Link or path</label><input type="text" name="fileUrl" placeholder="Shared-drive link or file path"></div>
+      </div>
+      <div class="modal-foot"><button type="button" class="btn" data-cancel>Cancel</button><button type="submit" class="btn primary">Add</button></div>
+    </form>
+  </div>`;
+}
+function modalSetReminder(i){
+  return `<div class="modal">
+    <div class="modal-head"><h3>Remind Me — ${i.issueNumber}</h3><button class="modal-close">×</button></div>
+    <form id="formReminder">
+      <div class="modal-body">
+        <div class="field-row"><label>Due date <span class="req">*</span></label><input type="date" name="dueDate" required value="${i.dueDate? i.dueDate.slice(0,10):''}"></div>
+        <div class="hint">You'll get a reminder 3 days before this date, and again on the day it's due — as long as FixFlow is open in a browser tab.</div>
+      </div>
+      <div class="modal-foot"><button type="button" class="btn" data-cancel>Cancel</button><button type="submit" class="btn primary">Save Reminder</button></div>
+    </form>
+  </div>`;
+}
+function bindModalSubmit(type, issueId){
+  const formMap = { new:'formNew', edit:'formEdit', update:'formUpdate', report:'formReport', attach:'formAttach', reminder:'formReminder' };
+  const form = document.getElementById(formMap[type]);
+  if(!form) return;
+  form.addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const data = Object.fromEntries(new FormData(form).entries());
+    const fileInput = form.querySelector('input[name=images]');
+    const files = fileInput ? Array.from(fileInput.files) : [];
+    if(type==='attach' && !files.length && !data.fileName){
+      showToast('Add an image or a file name first.', true);
+      return;
+    }
+    closeModal();
+    if(type==='new') await createIssue(data, files);
+    if(type==='edit') await editIssue(issueId, data);
+    if(type==='update') await addUpdate(issueId, data);
+    if(type==='report') await markReported(issueId, data);
+    if(type==='attach') await addAttachments(issueId, files, data.fileName, data.fileUrl);
+    if(type==='reminder') await setReminder(issueId, data);
+  });
+}
+
+/* ============================= INIT / RENDER LOOP ============================= */
+function renderAll(){
+  renderNav();
+  if(view.name!=='issues') selectedIds.clear();
+  if(view.name==='dashboard') renderDashboard();
+  else if(view.name==='issues') renderIssuesList();
+  else if(view.name==='archive') renderArchive();
+  else if(view.name==='detail') renderDetail();
+  else if(view.name==='insights') renderInsights();
+}
+document.getElementById('btnNewIssueNav').addEventListener('click', ()=> openModal('new'));
+document.getElementById('fabNew').addEventListener('click', ()=> openModal('new'));
+document.getElementById('backupBtn').addEventListener('click', ()=> openModal('backup'));
+let searchDebounce;
+document.getElementById('globalSearch').addEventListener('input', (e)=>{
+  clearTimeout(searchDebounce);
+  searchDebounce = setTimeout(()=>{
+    filters.search = e.target.value;
+    if(view.name!=='issues') view = { name:'issues', issueId:null };
+    renderIssuesList();
+  }, 220);
+});
+
+document.addEventListener('keydown', (e)=>{
+  const modalOpen = document.getElementById('modal-root').innerHTML.trim() !== '';
+  if((e.metaKey || e.ctrlKey) && e.key.toLowerCase()==='k'){
+    e.preventDefault();
+    if(!modalOpen) openCommandPalette();
+    return;
+  }
+  if(modalOpen) return;
+  const tag = (e.target.tagName || '').toLowerCase();
+  const typing = tag==='input' || tag==='textarea' || tag==='select' || e.target.isContentEditable;
+  if(typing) return;
+  if(e.key==='n'){ e.preventDefault(); openModal('new'); }
+  else if(e.key==='/'){ e.preventDefault(); document.getElementById('globalSearch').focus(); }
+  else if(e.key==='1'){ view={name:'dashboard'}; renderAll(); }
+  else if(e.key==='2'){ view={name:'issues',issueId:null}; renderAll(); }
+  else if(e.key==='3'){ view={name:'insights'}; renderAll(); }
+  else if(e.key==='4'){ view={name:'archive'}; renderAll(); }
+});
+
+(async function init(){
+  await loadData();
+  renderAll();
+  requestNotificationPermission();
+  await checkReminders();
+  setInterval(checkReminders, 60 * 60 * 1000);
+  document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) checkReminders(); });
+})();
+</script>
+</body>
+</html>
