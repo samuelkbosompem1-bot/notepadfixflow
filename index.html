@@ -255,6 +255,7 @@
     .search-box{flex:1 1 100%;max-width:none;order:1;}
     .save-indicator{order:2;}
     #backupBtn{order:3;margin-left:auto;}
+    #signOutBtn{order:4;}
     .fab-new{display:flex;position:fixed;right:16px;bottom:74px;width:52px;height:52px;border-radius:50%;
               background:var(--accent);color:#fff;border:none;align-items:center;justify-content:center;
               font-size:26px;font-weight:400;box-shadow:var(--shadow-md);z-index:60;line-height:1;}
@@ -269,7 +270,18 @@
 </style>
 </head>
 <body>
-<div class="app">
+<div id="authGate" style="position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:500;">
+  <div style="text-align:center;max-width:320px;padding:24px;">
+    <div class="logo-mark" style="margin:0 auto 18px auto;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2H4a1 1 0 0 0-1 1v18a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V8l-6-6z"/><path d="M15 2v6h6"/><path d="M9 13h6M9 17h4"/></svg>
+    </div>
+    <h1 style="font-family:'Fraunces',serif;font-size:22px;margin:0 0 6px 0;">Notepad FixFlow</h1>
+    <p class="page-sub" style="margin-bottom:22px;">Sign in to access your issues.</p>
+    <button class="btn primary" id="signInBtn" style="width:100%;">Sign in with Google</button>
+    <p class="hint" id="authStatus" style="margin-top:14px;"></p>
+  </div>
+</div>
+<div class="app" id="appRoot" style="display:none;">
   <aside class="sidebar">
     <div class="logo">
       <div class="logo-mark">
@@ -293,6 +305,7 @@
       </div>
       <div class="save-indicator" id="saveIndicator"><span class="save-dot"></span>Saved</div>
       <button class="btn sm" id="backupBtn">Backup</button>
+      <button class="btn sm" id="signOutBtn">Sign Out</button>
     </div>
     <div id="view-root"></div>
   </main>
@@ -341,23 +354,34 @@ let state = { issues: [], nextNum: 1 };
 let view = { name: 'dashboard', issueId: null };
 let filters = { status:'', priority:'', reported:'', followup:'', search:'', sort:'smart', dateFrom:'', dateTo:'' };
 let selectedIds = new Set();
-const STORAGE_KEY = 'fixflow-data-v1';
+let currentUser = null; // set by Firebase auth state listener
 const INACTIVE_DAYS = 5;
 
 function defaultState(){ return { issues: [], nextNum: 1 }; }
 
+/* Issue/reminder/history data now lives in Firestore, one document per signed-in
+   user (fixflow_users/{uid}), so it syncs across devices. Images are unaffected —
+   they still go through window.storage (local-only), set up further down. */
 async function loadData(){
+  if(!currentUser){ state = defaultState(); return; }
   try{
-    const res = await window.storage.get(STORAGE_KEY, false);
-    state = (res && res.value) ? JSON.parse(res.value) : defaultState();
+    const ref = window.fbDoc(window.fbDb, 'fixflow_users', currentUser.uid);
+    const snap = await window.fbGetDoc(ref);
+    state = (snap.exists() && snap.data().payload) ? JSON.parse(snap.data().payload) : defaultState();
   }catch(e){
     state = defaultState();
+    showToast('Could not load your data: ' + (e && e.message ? e.message : 'unknown error'), true);
+    console.error('FixFlow load error:', e);
   }
 }
 let saveTimer = null;
 async function saveData(){
   const indicator = document.getElementById('saveIndicator');
   if(indicator) indicator.innerHTML = '<span class="save-dot" style="background:var(--high)"></span>Saving…';
+  if(!currentUser){
+    if(indicator) indicator.innerHTML = '<span class="save-dot" style="background:var(--critical)"></span>Not signed in';
+    return;
+  }
   let payload;
   try{
     payload = JSON.stringify(state);
@@ -369,16 +393,17 @@ async function saveData(){
   }
   const sizeMB = payload.length / (1024*1024);
   try{
-    await window.storage.set(STORAGE_KEY, payload, false);
+    const ref = window.fbDoc(window.fbDb, 'fixflow_users', currentUser.uid);
+    await window.fbSetDoc(ref, { payload, updatedAt: nowISO() });
     if(indicator) indicator.innerHTML = '<span class="save-dot"></span>Saved';
-    if(sizeMB > 4.2){
-      showToast(`Warning: your data is ${sizeMB.toFixed(2)}MB, nearing the 5MB storage limit. Use Backup, then consider archiving old issues.`, true);
+    if(sizeMB > 0.85){
+      showToast(`Warning: your data is ${sizeMB.toFixed(2)}MB, nearing Firestore's 1MB per-document limit. Use Backup, then consider archiving old issues.`, true);
     }
   }catch(e){
     if(indicator) indicator.innerHTML = '<span class="save-dot" style="background:var(--critical)"></span>Save failed';
     const detail = (e && e.message) ? e.message : String(e);
-    showToast(`Could not save (${detail}). Data size: ${sizeMB.toFixed(2)}MB. Use Backup now so you don't lose this change.`, true);
-    console.error('FixFlow save error (storage.set):', e);
+    showToast(`Could not save (${detail}). Use Backup now so you don't lose this change.`, true);
+    console.error('FixFlow save error (Firestore):', e);
   }
 }
 
@@ -1644,6 +1669,10 @@ function renderAll(){
 document.getElementById('btnNewIssueNav').addEventListener('click', ()=> openModal('new'));
 document.getElementById('fabNew').addEventListener('click', ()=> openModal('new'));
 document.getElementById('backupBtn').addEventListener('click', ()=> openModal('backup'));
+document.getElementById('signOutBtn').addEventListener('click', async ()=>{
+  try{ await window.fbSignOut(); }
+  catch(e){ showToast('Sign-out failed: ' + (e && e.message ? e.message : 'unknown error'), true); }
+});
 let searchDebounce;
 document.getElementById('globalSearch').addEventListener('input', (e)=>{
   clearTimeout(searchDebounce);
@@ -1673,14 +1702,76 @@ document.addEventListener('keydown', (e)=>{
   else if(e.key==='4'){ view={name:'archive'}; renderAll(); }
 });
 
-(async function init(){
-  await loadData();
-  renderAll();
-  requestNotificationPermission();
-  await checkReminders();
-  setInterval(checkReminders, 60 * 60 * 1000);
-  document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) checkReminders(); });
-})();
+document.getElementById('signInBtn').addEventListener('click', async ()=>{
+  const statusEl = document.getElementById('authStatus');
+  if(statusEl) statusEl.textContent = 'Opening sign-in…';
+  try{
+    await window.fbSignIn();
+  }catch(e){
+    if(statusEl) statusEl.textContent = 'Sign-in failed: ' + (e && e.message ? e.message : 'unknown error');
+    console.error('FixFlow sign-in error:', e);
+  }
+});
+
+let reminderInterval = null;
+window.onFixFlowAuthChange = async function(user){
+  currentUser = user;
+  const gate = document.getElementById('authGate');
+  const appRoot = document.getElementById('appRoot');
+  if(user){
+    gate.style.display = 'none';
+    appRoot.style.display = 'flex';
+    await loadData();
+    renderAll();
+    requestNotificationPermission();
+    await checkReminders();
+    if(!reminderInterval){
+      reminderInterval = setInterval(checkReminders, 60 * 60 * 1000);
+      document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) checkReminders(); });
+    }
+  } else {
+    gate.style.display = 'flex';
+    appRoot.style.display = 'none';
+    state = defaultState();
+  }
+};
+</script>
+
+<!-- Firebase: Google Sign-In + Firestore. Bridges to the classic script above
+     via window.fb* globals, since Firebase's CDN import syntax only works in
+     ES modules, not in a classic <script>. -->
+<script type="module">
+  import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js';
+  import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
+    from 'https://www.gstatic.com/firebasejs/12.17.1/firebase-auth.js';
+  import { getFirestore, doc, getDoc, setDoc }
+    from 'https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js';
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyCFOYwz94plqs1o1mLUJWkxPDnDB77GUHA",
+    authDomain: "notepad-fixflow-1.firebaseapp.com",
+    projectId: "notepad-fixflow-1",
+    storageBucket: "notepad-fixflow-1.firebasestorage.app",
+    messagingSenderId: "764397124003",
+    appId: "1:764397124003:web:cd777f646bf8dbbcc78216"
+  };
+
+  const firebaseApp = initializeApp(firebaseConfig);
+  const auth = getAuth(firebaseApp);
+  const db = getFirestore(firebaseApp);
+  const provider = new GoogleAuthProvider();
+
+  window.fbAuth = auth;
+  window.fbDb = db;
+  window.fbDoc = doc;
+  window.fbGetDoc = getDoc;
+  window.fbSetDoc = setDoc;
+  window.fbSignIn = () => signInWithPopup(auth, provider);
+  window.fbSignOut = () => signOut(auth);
+
+  onAuthStateChanged(auth, (user) => {
+    if (window.onFixFlowAuthChange) window.onFixFlowAuthChange(user);
+  });
 </script>
 </body>
 </html>
