@@ -260,6 +260,7 @@
     .save-indicator{order:2;}
     #backupBtn{order:3;margin-left:auto;}
     #signOutBtn{order:4;}
+    #accountLabel{order:5;flex-basis:100%;text-align:right;}
     .fab-new{display:flex;position:fixed;right:16px;bottom:74px;width:52px;height:52px;border-radius:50%;
               background:var(--accent);color:#fff;border:none;align-items:center;justify-content:center;
               font-size:26px;font-weight:400;box-shadow:var(--shadow-md);z-index:60;line-height:1;}
@@ -308,6 +309,7 @@
         <input type="text" id="globalSearch" placeholder="Search issues, people, updates…">
       </div>
       <div class="save-indicator" id="saveIndicator"><span class="save-dot"></span>Saved</div>
+      <span class="cell-sub" id="accountLabel" style="white-space:nowrap;"></span>
       <button class="btn sm" id="backupBtn">Backup</button>
       <button class="btn sm" id="signOutBtn">Sign Out</button>
     </div>
@@ -1295,8 +1297,32 @@ function requestNotificationPermission(){
     Notification.requestPermission().catch(()=>{});
   }
 }
+let reminderAudioCtx = null;
+function playReminderTone(){
+  try{
+    if(!reminderAudioCtx) reminderAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if(reminderAudioCtx.state === 'suspended') reminderAudioCtx.resume();
+    const ctx = reminderAudioCtx;
+    const now = ctx.currentTime;
+    const chime = (freq, start, dur, peak) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, now + start);
+      gain.gain.setValueAtTime(0.0001, now + start);
+      gain.gain.exponentialRampToValueAtTime(peak, now + start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + start + dur);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(now + start);
+      osc.stop(now + start + dur + 0.05);
+    };
+    chime(880, 0, 0.35, 0.2);      // A5
+    chime(1174.66, 0.15, 0.4, 0.16); // D6
+  }catch(e){ console.error('FixFlow tone error:', e); }
+}
 function notifyReminder(msg){
   showToast(msg);
+  playReminderTone();
   if('Notification' in window && Notification.permission==='granted'){
     try{ new Notification('Notepad FixFlow', { body: msg }); }catch(e){ /* ignore */ }
   }
@@ -1760,13 +1786,16 @@ window.onFixFlowAuthChange = function(user){
   currentUser = user;
   const gate = document.getElementById('authGate');
   const appRoot = document.getElementById('appRoot');
+  const accountLabel = document.getElementById('accountLabel');
   if(user){
     gate.style.display = 'none';
     appRoot.style.display = 'flex';
+    if(accountLabel) accountLabel.textContent = user.displayName ? `${user.displayName} (${user.email})` : (user.email || '');
     document.getElementById('view-root').innerHTML = '<div class="empty-state"><h3>Loading your issues…</h3></div>';
     startRealtimeSync();
   } else {
     stopRealtimeSync();
+    if(accountLabel) accountLabel.textContent = '';
     gate.style.display = 'flex';
     appRoot.style.display = 'none';
     state = defaultState();
@@ -1779,7 +1808,7 @@ window.onFixFlowAuthChange = function(user){
      since Firebase's CDN import syntax only works in ES modules. -->
 <script type="module">
   import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js';
-  import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence }
+  import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence }
     from 'https://www.gstatic.com/firebasejs/12.17.1/firebase-auth.js';
   import { initializeFirestore, persistentLocalCache, doc, setDoc, onSnapshot }
     from 'https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js';
@@ -1813,7 +1842,14 @@ window.onFixFlowAuthChange = function(user){
   window.fbDoc = doc;
   window.fbSetDoc = setDoc;
   window.fbOnSnapshot = onSnapshot;
-  window.fbSignIn = async () => { await authReady; return signInWithPopup(auth, provider); };
+  window.fbSignIn = async () => {
+    await authReady;
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    if(isMobile) return signInWithRedirect(auth, provider);
+    return signInWithPopup(auth, provider);
+  };
+  // Completes sign-in after a redirect (mobile flow above); harmless no-op otherwise.
+  getRedirectResult(auth).catch((e) => console.error('FixFlow redirect sign-in error:', e));
   window.fbSignOut = () => signOut(auth);
 
   window.fbStorageRef = (path) => ref(storage, path);
