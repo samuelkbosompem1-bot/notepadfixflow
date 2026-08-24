@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Notepad FixFlow</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#6E1F30">
+<link rel="icon" type="image/png" href="/icon-192.png">
+<link rel="apple-touch-icon" href="/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -1051,15 +1055,26 @@ function renderDetail(){
         <div class="section">
           <div class="section-head"><h2>Attachments</h2><button class="see-all" data-modal="attach">Add</button></div>
           <div class="section-body">
-            ${ (i.attachments||[]).length ? (i.attachments||[]).map(a=> a.fileType==='image' ? `
-              <div class="attach-item">
-                <span class="attach-thumb" data-imgkey="${a.storageKey}" data-attname="${esc(a.fileName)}">${esc(a.fileName)}</span>
-                <button class="attach-remove" data-removeattach="${a.id}">×</button>
-              </div>` : `
-              <div class="attach-item">
+            ${ (i.attachments||[]).length ? (i.attachments||[]).map(a=>{
+              if(a.fileType==='image' && a.fileUrl){
+                // Uploaded via Firebase Storage — synced across devices, renders immediately.
+                return `<div class="attach-item">
+                  <span class="attach-thumb"><img src="${esc(a.fileUrl)}" alt="${esc(a.fileName)}" data-preview="${esc(a.fileUrl)}">${esc(a.fileName)}</span>
+                  <button class="attach-remove" data-removeattach="${a.id}">×</button>
+                </div>`;
+              }
+              if(a.fileType==='image'){
+                // Pre-migration local image — device-local only, loaded async below.
+                return `<div class="attach-item">
+                  <span class="attach-thumb" data-imgkey="${a.storageKey}" data-attname="${esc(a.fileName)}">${esc(a.fileName)}</span>
+                  <button class="attach-remove" data-removeattach="${a.id}">×</button>
+                </div>`;
+              }
+              return `<div class="attach-item">
                 ${a.fileUrl ? `<a href="${esc(a.fileUrl)}" target="_blank" rel="noopener">${esc(a.fileName)}</a>` : esc(a.fileName)}
                 <button class="attach-remove" data-removeattach="${a.id}">×</button>
-              </div>`).join('')
+              </div>`;
+            }).join('')
               : '<div class="section-empty">No attachments yet. Upload images or link a file.</div>' }
           </div>
         </div>
@@ -1130,6 +1145,7 @@ function renderDetail(){
   if(archBtn) archBtn.addEventListener('click', ()=> archiveIssue(i.id));
   document.querySelectorAll('[data-removeattach]').forEach(btn=> btn.addEventListener('click', ()=> removeAttachment(i.id, btn.dataset.removeattach)));
   document.querySelectorAll('[data-snooze]').forEach(btn=> btn.addEventListener('click', ()=> snoozeReminder(btn.dataset.snooze, parseInt(btn.dataset.snoozedays,10))));
+  document.querySelectorAll('[data-preview]').forEach(img=> img.addEventListener('click', ()=> openImagePreview(img.dataset.preview)));
   loadAttachmentThumbnails();
 }
 function buildTimeline(i){
@@ -1303,17 +1319,21 @@ async function checkReminders(){
 }
 async function attachImageFiles(issue, files){
   if(!files || !files.length) return;
+  if(!currentUser){ showToast('Sign in before adding images.', true); return; }
   issue.attachments = issue.attachments || [];
   for(const file of files){
     try{
       const dataUrl = await readImageFile(file);
       const attId = uid();
-      const key = 'fixflow-img-' + attId;
-      await window.storage.set(key, dataUrl, false);
-      issue.attachments.push({ id:attId, fileName:file.name, fileType:'image', storageKey:key, createdAt: nowISO() });
+      const path = `users/${currentUser.uid}/${issue.id}/${attId}.jpg`;
+      const storageRef = window.fbStorageRef(path);
+      await window.fbUploadString(storageRef, dataUrl, 'data_url');
+      const downloadUrl = await window.fbGetDownloadURL(storageRef);
+      issue.attachments.push({ id:attId, fileName:file.name, fileType:'image', fileUrl:downloadUrl, storagePath:path, createdAt: nowISO() });
       pushHistory(issue,'attachment_added',null,file.name);
     }catch(e){
-      showToast('Could not attach image: ' + file.name, true);
+      showToast('Could not upload image: ' + file.name + ' (' + (e && e.message ? e.message : 'unknown error') + ')', true);
+      console.error('FixFlow image upload error:', e);
     }
   }
 }
@@ -1341,6 +1361,9 @@ function readImageFile(file){
     reader.readAsDataURL(file);
   });
 }
+/* Only needed for images attached before the Firebase Storage migration —
+   those were saved locally with a storageKey instead of a synced fileUrl.
+   New uploads render immediately from fileUrl and never call this. */
 function loadAttachmentThumbnails(){
   document.querySelectorAll('.attach-thumb[data-imgkey]').forEach(async el=>{
     const key = el.dataset.imgkey;
@@ -1354,10 +1377,10 @@ function loadAttachmentThumbnails(){
     }catch(e){ /* leave filename text as fallback */ }
   });
 }
-function openImagePreview(dataUrl){
+function openImagePreview(url){
   const root = document.getElementById('modal-root');
   root.innerHTML = `<div class="overlay" id="overlay"><div class="modal" style="max-width:90vw;background:transparent;box-shadow:none;">
-    <img src="${dataUrl}" style="max-width:100%;max-height:85vh;border-radius:8px;display:block;margin:0 auto;">
+    <img src="${url}" style="max-width:100%;max-height:85vh;border-radius:8px;display:block;margin:0 auto;">
   </div></div>`;
   document.getElementById('overlay').addEventListener('click', closeModal);
   document.addEventListener('keydown', escCloseOnce);
@@ -1383,7 +1406,9 @@ async function removeAttachment(id, attachId){
   i.attachments = (i.attachments||[]).filter(a=>a.id!==attachId);
   i.updatedAt = nowISO();
   await saveData(); renderDetail();
-  if(att && att.storageKey){
+  if(att && att.storagePath){
+    try{ await window.fbDeleteObject(window.fbStorageRef(att.storagePath)); }catch(e){ console.error('FixFlow storage delete error:', e); }
+  } else if(att && att.storageKey){
     try{ await window.storage.delete(att.storageKey, false); }catch(e){ /* best effort */ }
   }
 }
