@@ -355,26 +355,44 @@ let view = { name: 'dashboard', issueId: null };
 let filters = { status:'', priority:'', reported:'', followup:'', search:'', sort:'smart', dateFrom:'', dateTo:'' };
 let selectedIds = new Set();
 let currentUser = null; // set by Firebase auth state listener
+let unsubscribeSnapshot = null;
+let reminderInterval = null;
 const INACTIVE_DAYS = 5;
 
 function defaultState(){ return { issues: [], nextNum: 1 }; }
 
-/* Issue/reminder/history data now lives in Firestore, one document per signed-in
-   user (fixflow_users/{uid}), so it syncs across devices. Images are unaffected —
-   they still go through window.storage (local-only), set up further down. */
-async function loadData(){
-  if(!currentUser){ state = defaultState(); return; }
-  try{
-    const ref = window.fbDoc(window.fbDb, 'fixflow_users', currentUser.uid);
-    const snap = await window.fbGetDoc(ref);
+/* Issue/reminder/history data lives in Firestore, one document per signed-in
+   user (fixflow_users/{uid}). Instead of a one-time fetch, we keep a live
+   onSnapshot listener open — so a change made on your phone appears on your
+   laptop immediately, no refresh needed. Images go through Firebase Storage,
+   set up further down, so they sync too. */
+function startRealtimeSync(){
+  if(unsubscribeSnapshot){ unsubscribeSnapshot(); unsubscribeSnapshot = null; }
+  const ref = window.fbDoc(window.fbDb, 'fixflow_users', currentUser.uid);
+  let firstSnapshot = true;
+  unsubscribeSnapshot = window.fbOnSnapshot(ref, async (snap) => {
     state = (snap.exists() && snap.data().payload) ? JSON.parse(snap.data().payload) : defaultState();
-  }catch(e){
-    state = defaultState();
-    showToast('Could not load your data: ' + (e && e.message ? e.message : 'unknown error'), true);
-    console.error('FixFlow load error:', e);
-  }
+    renderAll();
+    if(firstSnapshot){
+      firstSnapshot = false;
+      requestNotificationPermission();
+      await checkReminders();
+      if(!reminderInterval){
+        reminderInterval = setInterval(checkReminders, 60 * 60 * 1000);
+        document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) checkReminders(); });
+      }
+    }
+  }, (error) => {
+    document.getElementById('view-root').innerHTML =
+      `<div class="empty-state"><h3>Could not load your issues</h3><p>${esc(error && error.message ? error.message : 'Unknown error')}</p></div>`;
+    showToast('Sync error: ' + (error && error.message ? error.message : 'unknown error'), true);
+    console.error('FixFlow snapshot error:', error);
+  });
 }
-let saveTimer = null;
+function stopRealtimeSync(){
+  if(unsubscribeSnapshot){ unsubscribeSnapshot(); unsubscribeSnapshot = null; }
+  if(reminderInterval){ clearInterval(reminderInterval); reminderInterval = null; }
+}
 async function saveData(){
   const indicator = document.getElementById('saveIndicator');
   if(indicator) indicator.innerHTML = '<span class="save-dot" style="background:var(--high)"></span>Saving…';
@@ -1713,23 +1731,17 @@ document.getElementById('signInBtn').addEventListener('click', async ()=>{
   }
 });
 
-let reminderInterval = null;
-window.onFixFlowAuthChange = async function(user){
+window.onFixFlowAuthChange = function(user){
   currentUser = user;
   const gate = document.getElementById('authGate');
   const appRoot = document.getElementById('appRoot');
   if(user){
     gate.style.display = 'none';
     appRoot.style.display = 'flex';
-    await loadData();
-    renderAll();
-    requestNotificationPermission();
-    await checkReminders();
-    if(!reminderInterval){
-      reminderInterval = setInterval(checkReminders, 60 * 60 * 1000);
-      document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) checkReminders(); });
-    }
+    document.getElementById('view-root').innerHTML = '<div class="empty-state"><h3>Loading your issues…</h3></div>';
+    startRealtimeSync();
   } else {
+    stopRealtimeSync();
     gate.style.display = 'flex';
     appRoot.style.display = 'none';
     state = defaultState();
@@ -1737,15 +1749,17 @@ window.onFixFlowAuthChange = async function(user){
 };
 </script>
 
-<!-- Firebase: Google Sign-In + Firestore. Bridges to the classic script above
-     via window.fb* globals, since Firebase's CDN import syntax only works in
-     ES modules, not in a classic <script>. -->
+<!-- Firebase: Google Sign-In + Firestore (real-time, offline-capable) + Storage
+     for images. Bridges to the classic script above via window.fb* globals,
+     since Firebase's CDN import syntax only works in ES modules. -->
 <script type="module">
   import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js';
-  import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
+  import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence }
     from 'https://www.gstatic.com/firebasejs/12.17.1/firebase-auth.js';
-  import { getFirestore, doc, getDoc, setDoc }
+  import { initializeFirestore, persistentLocalCache, doc, setDoc, onSnapshot }
     from 'https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js';
+  import { getStorage, ref, uploadString, getDownloadURL, deleteObject }
+    from 'https://www.gstatic.com/firebasejs/12.17.1/firebase-storage.js';
 
   const firebaseConfig = {
     apiKey: "AIzaSyCFOYwz94plqs1o1mLUJWkxPDnDB77GUHA",
@@ -1758,20 +1772,39 @@ window.onFixFlowAuthChange = async function(user){
 
   const firebaseApp = initializeApp(firebaseConfig);
   const auth = getAuth(firebaseApp);
-  const db = getFirestore(firebaseApp);
+  // Explicit local persistence: sign-in survives a page refresh or full browser
+  // restart, not just navigation within the same tab session.
+  const authReady = setPersistence(auth, browserLocalPersistence).catch((e) => {
+    console.error('FixFlow persistence setup error:', e);
+  });
+  // persistentLocalCache enables offline reads/writes: FixFlow keeps working
+  // (from local cache) if the network drops, and syncs once it's back.
+  const db = initializeFirestore(firebaseApp, { localCache: persistentLocalCache() });
+  const storage = getStorage(firebaseApp);
   const provider = new GoogleAuthProvider();
 
   window.fbAuth = auth;
   window.fbDb = db;
   window.fbDoc = doc;
-  window.fbGetDoc = getDoc;
   window.fbSetDoc = setDoc;
-  window.fbSignIn = () => signInWithPopup(auth, provider);
+  window.fbOnSnapshot = onSnapshot;
+  window.fbSignIn = async () => { await authReady; return signInWithPopup(auth, provider); };
   window.fbSignOut = () => signOut(auth);
+
+  window.fbStorageRef = (path) => ref(storage, path);
+  window.fbUploadString = uploadString;
+  window.fbGetDownloadURL = getDownloadURL;
+  window.fbDeleteObject = deleteObject;
 
   onAuthStateChanged(auth, (user) => {
     if (window.onFixFlowAuthChange) window.onFixFlowAuthChange(user);
   });
+
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js').catch((e) => console.error('SW registration failed:', e));
+    });
+  }
 </script>
 </body>
 </html>
