@@ -1199,7 +1199,13 @@ async function createIssue(data, files){
     solvedAt:null, closedAt:null, archived:false, updates:[], history:[], attachments:[]
   };
   pushHistory(issue,'created',null,null);
-  await attachImageFiles(issue, files);
+  // issue.id already exists, so uploads can start before the issue is
+  // visible anywhere in shared state — safe regardless of what a concurrent
+  // sync update does in the meantime, since `issue` isn't reachable from
+  // `state` until the unshift below.
+  const uploaded = await uploadImageFiles(issue.id, files);
+  issue.attachments.push(...uploaded);
+  uploaded.forEach(a => pushHistory(issue,'attachment_added',null,a.fileName));
   state.issues.unshift(issue);
   state.nextNum += 1;
   await saveData();
@@ -1343,25 +1349,34 @@ async function checkReminders(){
   }
   if(changed) await saveData();
 }
-async function attachImageFiles(issue, files){
-  if(!files || !files.length) return;
-  if(!currentUser){ showToast('Sign in before adding images.', true); return; }
-  issue.attachments = issue.attachments || [];
+/* Uploads images and returns the resulting attachment records — it does NOT
+   mutate any issue object directly. Uploading takes real time (compress,
+   upload, get URL), and real-time sync can replace the shared `state` object
+   at any moment while that's happening. If this function mutated a captured
+   issue reference directly, a sync update landing mid-upload would silently
+   orphan that reference, and the upload would be lost when saveData() saves
+   the (now different) current state instead. Callers apply these results to
+   a freshly-looked-up issue immediately before saving, with no await in
+   between, so there's no window for that to happen. */
+async function uploadImageFiles(issueId, files){
+  if(!files || !files.length) return [];
+  if(!currentUser){ showToast('Sign in before adding images.', true); return []; }
+  const results = [];
   for(const file of files){
     try{
       const dataUrl = await readImageFile(file);
       const attId = uid();
-      const path = `users/${currentUser.uid}/${issue.id}/${attId}.jpg`;
+      const path = `users/${currentUser.uid}/${issueId}/${attId}.jpg`;
       const storageRef = window.fbStorageRef(path);
       await window.fbUploadString(storageRef, dataUrl, 'data_url');
       const downloadUrl = await window.fbGetDownloadURL(storageRef);
-      issue.attachments.push({ id:attId, fileName:file.name, fileType:'image', fileUrl:downloadUrl, storagePath:path, createdAt: nowISO() });
-      pushHistory(issue,'attachment_added',null,file.name);
+      results.push({ id:attId, fileName:file.name, fileType:'image', fileUrl:downloadUrl, storagePath:path, createdAt: nowISO() });
     }catch(e){
       showToast('Could not upload image: ' + file.name + ' (' + (e && e.message ? e.message : 'unknown error') + ')', true);
       console.error('FixFlow image upload error:', e);
     }
   }
+  return results;
 }
 function readImageFile(file){
   return new Promise((resolve, reject)=>{
@@ -1416,10 +1431,15 @@ async function addAttachments(id, files, fileName, fileUrl){
     showToast('Add an image or a file name first.', true);
     return;
   }
+  // Slow work first (uploads), touching nothing in `state` yet.
+  const uploaded = await uploadImageFiles(id, files);
+  // Fresh lookup, right before the synchronous mutation + save — never a
+  // reference captured before the upload started.
   const i = getIssue(id);
-  await attachImageFiles(i, files);
+  if(!i){ showToast('That issue could not be found — try refreshing.', true); return; }
+  i.attachments = i.attachments || [];
+  uploaded.forEach(a => { i.attachments.push(a); pushHistory(i,'attachment_added',null,a.fileName); });
   if(fileName){
-    i.attachments = i.attachments || [];
     i.attachments.push({ id:uid(), fileName, fileType:'link', fileUrl: fileUrl||'', createdAt: nowISO() });
     pushHistory(i,'attachment_added',null,fileName);
   }
@@ -1846,8 +1866,11 @@ window.onFixFlowAuthChange = function(user){
   window.fbDoc = doc;
   window.fbSetDoc = setDoc;
   window.fbOnSnapshot = onSnapshot;
-  window.fbSignIn = async () => {
-    await authReady;
+  window.fbSignIn = () => {
+    // No await here on purpose: signInWithPopup must be called synchronously
+    // within the click handler, or browsers treat it as not user-initiated
+    // and silently block the popup (auth/popup-blocked). setPersistence was
+    // already called above at page load, well before any click can happen.
     const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
     if(isMobile) return signInWithRedirect(auth, provider);
     return signInWithPopup(auth, provider);
