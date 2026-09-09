@@ -1199,19 +1199,24 @@ async function createIssue(data, files){
     solvedAt:null, closedAt:null, archived:false, updates:[], history:[], attachments:[]
   };
   pushHistory(issue,'created',null,null);
-  // issue.id already exists, so uploads can start before the issue is
-  // visible anywhere in shared state — safe regardless of what a concurrent
-  // sync update does in the meantime, since `issue` isn't reachable from
-  // `state` until the unshift below.
-  const uploaded = await uploadImageFiles(issue.id, files);
-  issue.attachments.push(...uploaded);
-  uploaded.forEach(a => pushHistory(issue,'attachment_added',null,a.fileName));
-  state.issues.unshift(issue);
-  state.nextNum += 1;
-  await saveData();
-  goToIssue(issue.id);
-  showToast(`${issue.issueNumber} created.`);
-  checkReminders();
+  try{
+    // issue.id already exists, so uploads can start before the issue is
+    // visible anywhere in shared state — safe regardless of what a concurrent
+    // sync update does in the meantime, since `issue` isn't reachable from
+    // `state` until the unshift below.
+    const uploaded = await uploadImageFiles(issue.id, files);
+    issue.attachments.push(...uploaded);
+    uploaded.forEach(a => pushHistory(issue,'attachment_added',null,a.fileName));
+    state.issues.unshift(issue);
+    state.nextNum += 1;
+    await saveData();
+    goToIssue(issue.id);
+    showToast(`${issue.issueNumber} created.`);
+    checkReminders();
+  }catch(e){
+    showToast('Could not create issue: ' + (e && e.message ? e.message : 'unknown error'), true);
+    console.error('FixFlow createIssue error:', e);
+  }
 }
 async function editIssue(id, data){
   const i = getIssue(id);
@@ -1431,20 +1436,31 @@ async function addAttachments(id, files, fileName, fileUrl){
     showToast('Add an image or a file name first.', true);
     return;
   }
-  // Slow work first (uploads), touching nothing in `state` yet.
-  const uploaded = await uploadImageFiles(id, files);
-  // Fresh lookup, right before the synchronous mutation + save — never a
-  // reference captured before the upload started.
-  const i = getIssue(id);
-  if(!i){ showToast('That issue could not be found — try refreshing.', true); return; }
-  i.attachments = i.attachments || [];
-  uploaded.forEach(a => { i.attachments.push(a); pushHistory(i,'attachment_added',null,a.fileName); });
-  if(fileName){
-    i.attachments.push({ id:uid(), fileName, fileType:'link', fileUrl: fileUrl||'', createdAt: nowISO() });
-    pushHistory(i,'attachment_added',null,fileName);
+  try{
+    // Slow work first (uploads), touching nothing in `state` yet.
+    const uploaded = await uploadImageFiles(id, files);
+    if(files && files.length && uploaded.length === 0 && !fileName){
+      // Every image failed — uploadImageFiles already showed the specific
+      // error per file, so just stop here instead of silently "succeeding"
+      // with nothing added.
+      return;
+    }
+    // Fresh lookup, right before the synchronous mutation + save — never a
+    // reference captured before the upload started.
+    const i = getIssue(id);
+    if(!i){ showToast('That issue could not be found — try refreshing.', true); return; }
+    i.attachments = i.attachments || [];
+    uploaded.forEach(a => { i.attachments.push(a); pushHistory(i,'attachment_added',null,a.fileName); });
+    if(fileName){
+      i.attachments.push({ id:uid(), fileName, fileType:'link', fileUrl: fileUrl||'', createdAt: nowISO() });
+      pushHistory(i,'attachment_added',null,fileName);
+    }
+    i.updatedAt = nowISO();
+    await saveData(); renderDetail(); showToast('Attachment added.');
+  }catch(e){
+    showToast('Could not add attachment: ' + (e && e.message ? e.message : 'unknown error'), true);
+    console.error('FixFlow addAttachments error:', e);
   }
-  i.updatedAt = nowISO();
-  await saveData(); renderDetail(); showToast('Attachment added.');
 }
 async function removeAttachment(id, attachId){
   const i = getIssue(id);
@@ -1728,20 +1744,25 @@ function bindModalSubmit(type, issueId){
   if(!form) return;
   form.addEventListener('submit', async (e)=>{
     e.preventDefault();
-    const data = Object.fromEntries(new FormData(form).entries());
-    const fileInput = form.querySelector('input[name=images]');
-    const files = fileInput ? Array.from(fileInput.files) : [];
-    if(type==='attach' && !files.length && !data.fileName){
-      showToast('Add an image or a file name first.', true);
-      return;
+    try{
+      const data = Object.fromEntries(new FormData(form).entries());
+      const fileInput = form.querySelector('input[name=images]');
+      const files = fileInput ? Array.from(fileInput.files) : [];
+      if(type==='attach' && !files.length && !data.fileName){
+        showToast('Add an image or a file name first.', true);
+        return;
+      }
+      closeModal();
+      if(type==='new') await createIssue(data, files);
+      if(type==='edit') await editIssue(issueId, data);
+      if(type==='update') await addUpdate(issueId, data);
+      if(type==='report') await markReported(issueId, data);
+      if(type==='attach') await addAttachments(issueId, files, data.fileName, data.fileUrl);
+      if(type==='reminder') await setReminder(issueId, data);
+    }catch(e){
+      showToast('Something went wrong: ' + (e && e.message ? e.message : 'unknown error'), true);
+      console.error('FixFlow form submit error:', e);
     }
-    closeModal();
-    if(type==='new') await createIssue(data, files);
-    if(type==='edit') await editIssue(issueId, data);
-    if(type==='update') await addUpdate(issueId, data);
-    if(type==='report') await markReported(issueId, data);
-    if(type==='attach') await addAttachments(issueId, files, data.fileName, data.fileUrl);
-    if(type==='reminder') await setReminder(issueId, data);
   });
 }
 
