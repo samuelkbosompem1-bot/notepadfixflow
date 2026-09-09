@@ -1355,30 +1355,25 @@ async function checkReminders(){
   if(changed) await saveData();
 }
 /* Uploads images and returns the resulting attachment records — it does NOT
-   mutate any issue object directly. Uploading takes real time (compress,
-   upload, get URL), and real-time sync can replace the shared `state` object
-   at any moment while that's happening. If this function mutated a captured
-   issue reference directly, a sync update landing mid-upload would silently
-   orphan that reference, and the upload would be lost when saveData() saves
-   the (now different) current state instead. Callers apply these results to
-   a freshly-looked-up issue immediately before saving, with no await in
-   between, so there's no window for that to happen. */
+   mutate any issue object directly. Uses local device storage (not synced
+   across devices — Firebase Storage requires the paid Blaze plan as of
+   Feb 2026, so this stays free). Callers apply these results to a
+   freshly-looked-up issue immediately before saving, with no await in
+   between, avoiding the same kind of race a slow upload could otherwise
+   cause against the real-time sync listener. */
 async function uploadImageFiles(issueId, files){
   if(!files || !files.length) return [];
-  if(!currentUser){ showToast('Sign in before adding images.', true); return []; }
   const results = [];
   for(const file of files){
     try{
       const dataUrl = await readImageFile(file);
       const attId = uid();
-      const path = `users/${currentUser.uid}/${issueId}/${attId}.jpg`;
-      const storageRef = window.fbStorageRef(path);
-      await window.fbUploadString(storageRef, dataUrl, 'data_url');
-      const downloadUrl = await window.fbGetDownloadURL(storageRef);
-      results.push({ id:attId, fileName:file.name, fileType:'image', fileUrl:downloadUrl, storagePath:path, createdAt: nowISO() });
+      const key = 'fixflow-img-' + attId;
+      await window.storage.set(key, dataUrl, false);
+      results.push({ id:attId, fileName:file.name, fileType:'image', storageKey:key, createdAt: nowISO() });
     }catch(e){
-      showToast('Could not upload image: ' + file.name + ' (' + (e && e.message ? e.message : 'unknown error') + ')', true);
-      console.error('FixFlow image upload error:', e);
+      showToast('Could not save image: ' + file.name + ' (' + (e && e.message ? e.message : 'unknown error') + ')', true);
+      console.error('FixFlow image save error:', e);
     }
   }
   return results;
@@ -1641,7 +1636,7 @@ function modalNewIssue(){
           <div class="hint">Optional — you'll get a reminder 3 days before this date and again on the day it's due.</div>
         </div>
         <div class="field-row"><label>Images</label><input type="file" name="images" accept="image/*" multiple>
-          <div class="hint">Optional — screenshots or photos are compressed and stored inside this file automatically.</div>
+          <div class="hint">Optional — screenshots or photos are compressed and saved on this device. They won't appear on your other devices.</div>
         </div>
         <div class="hint">You can add category, system, and reporting details later from the issue page.</div>
       </div>
@@ -1717,7 +1712,7 @@ function modalAttach(i){
     <form id="formAttach">
       <div class="modal-body">
         <div class="field-row"><label>Upload images</label><input type="file" name="images" accept="image/*" multiple>
-          <div class="hint">Compressed and stored inside this file automatically.</div>
+          <div class="hint">Compressed and saved on this device. Won't appear on your other devices.</div>
         </div>
         <div class="field-row" style="margin-top:18px;"><label>Or link a file</label><input type="text" name="fileName" placeholder="File name, e.g. report.pdf"></div>
         <div class="field-row"><label>Link or path</label><input type="text" name="fileUrl" placeholder="Shared-drive link or file path"></div>
